@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'users'
 ]
 
+AUTH_USER_MODEL = 'users.User'
+
 
 
 MIDDLEWARE = [
@@ -78,14 +80,33 @@ WSGI_APPLICATION = 'mindable.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# mindable/settings.py
+
+# 1. Register the app so Django looks for models here
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'users',
+    'mindable.mindable_app',
+]
+
+# 2. Point to your custom User class
+AUTH_USER_MODEL = 'users.User'
+
+# 3. The PostgreSQL Handshake
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'mindable_db'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'mindable123'),
-        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': 'mindable_db',
+        'USER': 'postgres',      
+        'PASSWORD': 'Ra037210?', 
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
     }
 }
 

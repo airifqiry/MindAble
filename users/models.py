@@ -1,41 +1,23 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.core.validators import MaxValueValidator, MinValueValidator
 
-class CustomUser(AbstractUser):
-    """
-    The MindAble User Model. 
-    Fixes the 'Reverse Accessor' clash by setting unique related_names.
-    """
+class User(AbstractUser):
+    is_job_seeker = models.BooleanField(default=True)
     is_employer = models.BooleanField(default=False)
-
-    groups = models.ManyToManyField(
-        'auth.Group',
-        related_name='custom_user_set', 
-        blank=True
-    )
-    user_permissions = models.ManyToManyField(
-        'auth.Permission',
-        related_name='custom_user_permissions_set',
-        blank=True
+    daily_capacity = models.IntegerField(
+        default=100, 
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
 
 class WorkplacePassport(models.Model):
-    """
-    The Core Product: Stores the neurodivergent user's boundaries.
-    """
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='passport')
-    
-    # Capacity Check (The 'Spoon Slider')
-    energy_level = models.IntegerField(default=5) 
-    
-    # Dealbreakers (Based on your strategy)
-    avoid_loud_environments = models.BooleanField(default=False)
-    avoid_cold_calling = models.BooleanField(default=False)
-    avoid_unpredictable_shifts = models.BooleanField(default=False)
-    
-    # Success Enablers
-    needs_written_instructions = models.BooleanField(default=False)
-    prefers_async_communication = models.BooleanField(default=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='passport')
+    resume_pdf = models.FileField(upload_to='resumes/', null=True, blank=True)
+    experience_summary = models.TextField(blank=True)
+    skills = models.TextField(blank=True)
+    success_enablers = models.JSONField(default=dict, blank=True)
+    dealbreakers = models.JSONField(default=list, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username}'s Workplace Passport"
+        return f"Passport: {self.user.username}"
