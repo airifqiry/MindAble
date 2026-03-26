@@ -1,144 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAble – Dashboard</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MindAble – Work that fits your mind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-
-  <link rel="stylesheet" href="./signup.css"/>
-  <link rel="stylesheet" href="./common.css"/>
-  <link rel="stylesheet" href="./dashboard.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'mindable/dashboard.css' %}"/>
 </head>
-<body data-active-page="home">
-  <!-- Background auras -->
-  <div class="bg">
-    <div class="aura aura-1"></div>
-    <div class="aura aura-2"></div>
-    <div class="aura aura-3"></div>
-  </div>
+<body>
 
-  <div id="nav-wrapper">
-    <nav>
-      <a class="nav-brand" href="./dashboard.html">
-        <div class="nav-logo">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </div>
-        MindAble
-      </a>
+<!-- Background blobs -->
+<div class="bg-auras">
+  <div class="aura aura-1"></div>
+  <div class="aura aura-2"></div>
+  <div class="aura aura-3"></div>
+  <div class="aura aura-4"></div>
+</div>
 
-      <div class="nav-links">
-        <a
-          href="#"
-          class="nav-menu-trigger"
-          id="nav-menu-trigger"
-          aria-haspopup="menu"
-          aria-controls="nav-menu-panel"
-          aria-expanded="false"
-        >
-          Menu
-        </a>
-      </div>
-    </nav>
-
-    <div id="nav-menu-panel" hidden>
-      <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
-      <a href="./jobs.html" data-page="jobs" class="nav-menu-link">Job Listings</a>
-      <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
-      <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
-      <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+<!-- NAV -->
+<nav id="navbar">
+  <button class="nav-menu-btn" id="nav-menu-btn" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <a href="#" class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
     </div>
+    MindAble
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
   </div>
+</nav>
 
-  <main class="mf-page">
-    <section class="mf-hero reveal">
-      <div class="mf-kicker">Welcome back, <span id="user-name">Alex</span></div>
-      <h1 class="mf-title">Your calm basecamp</h1>
-      <p class="mf-sub">
-        A gentle place to find roles that fit, practice interviews, and keep your workplace passport up to date.
-      </p>
-    </section>
+<!-- NAV DROPDOWN PANEL -->
+<div id="nav-menu-panel" hidden>
+  <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
+  <a href="./jobs.html" data-page="jobs" class="nav-menu-link">Job Listings</a>
+  <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
+  <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
+  <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+</div>
 
-    <section class="mf-grid">
-      <div class="mf-card reveal" id="profile">
-        <div class="mf-card-head">
-          <div class="mf-card-title">Profile completion</div>
-          <span class="mf-pill" aria-hidden="true">Private + protective</span>
-        </div>
+<!-- ═══ HERO ═══ -->
+<section class="hero">
 
-        <div class="mf-progress">
-          <div class="mf-progress-bar" aria-label="Profile completion progress">
-            <div class="mf-progress-fill" id="profile-progress-fill"></div>
-          </div>
-          <div class="mf-progress-meta">
-            <span>Your progress</span>
-            <strong id="profile-percent">65%</strong>
-          </div>
-        </div>
-      </div>
+  <h1 class="hero-headline">
+    Where your unique perspective<br/>meets its <span class="grad-text">perfect match</span>
+  </h1>
 
-      <div class="mf-card reveal">
-        <div class="mf-card-head">
-          <div class="mf-card-title">Your energy today</div>
-          <span class="mf-pill" aria-hidden="true">Low stress, better matches</span>
-        </div>
+  <p class="hero-sub">
+    MindAble matches neurodivergent professionals with roles built around
+    how they actually think — remote-first, async-friendly, and free of the
+    dealbreakers that drain you.
+  </p>
 
-        <div class="mf-energy-options" role="radiogroup" aria-label="Your energy today">
-          <label class="mf-energy-option">
-            <input type="radio" name="energy" value="low"/>
-            <span class="mf-energy-pill">Low</span>
-          </label>
-          <label class="mf-energy-option">
-            <input type="radio" name="energy" value="medium"/>
-            <span class="mf-energy-pill">Medium</span>
-          </label>
-          <label class="mf-energy-option">
-            <input type="radio" name="energy" value="high"/>
-            <span class="mf-energy-pill">High</span>
-          </label>
-        </div>
+  <div class="hero-actions">
+    <a href="job-board.html" class="btn-grad">Find my fit →</a>
+    <a href="#how" class="btn-ghost">See how it works</a>
+  </div>
+</section>
 
-        <div class="mf-energy-note" id="energy-note"></div>
-      </div>
-    </section>
+<!-- ═══ HOW IT WORKS ═══ -->
+<section id="how">
+  <div class="section-header reveal">
+    <p class="section-eyebrow">How it works</p>
+    <h2 class="section-title">Three steps to a job that <span class="grad-text">actually works for you</span></h2>
+    <p class="section-sub">No lengthy interviews, no guesswork. Just a profile that protects your energy and a feed built around your needs.</p>
+  </div>
+</section>
 
-    <section class="mf-actions">
-      <a class="mf-action reveal" href="./jobs.html" aria-label="Go to Job Listings">
-        <div class="mf-action-left">
-          <div class="mf-action-title">Job Listings</div>
-          <div class="mf-action-sub">Clean, scannable roles matched to you</div>
-        </div>
-        <div class="mf-action-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        </div>
-      </a>
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="section-header reveal">
+    <p class="section-eyebrow">Features</p>
+    <h2 class="section-title">Why MindAble <span class="grad-text">actually works</span></h2>
+    <p class="section-sub">Every feature exists to remove the barriers that standard job platforms put in front of neurodivergent professionals.</p>
+  </div>
+</section>
 
-      <a class="mf-action reveal" href="./prep.html" aria-label="Go to Interview Prep">
-        <div class="mf-action-left">
-          <div class="mf-action-title">Interview Prep</div>
-          <div class="mf-action-sub">Warm practice with a calm coach</div>
-        </div>
-        <div class="mf-action-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-      </a>
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <a href="#" class="footer-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:white;fill:none;stroke-width:2;stroke-linecap:round"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    </div>
+    MindAble
+  </a>
+  <div class="footer-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#">For employers</a>
+    <a href="#">Blog</a>
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+  </div>
+  <p class="footer-copy">© 2025 MindAble</p>
+</footer>
 
-      <a class="mf-action reveal" href="./dashboard.html#profile" aria-label="Edit Profile">
-        <div class="mf-action-left">
-          <div class="mf-action-title">Edit Profile</div>
-          <div class="mf-action-sub">Update what helps you thrive</div>
-        </div>
-        <div class="mf-action-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 21v-4l10.5-10.5 4 4L8 21H4z"/><path d="M13.5 6.5l4 4"/></svg>
-        </div>
-      </a>
-    </section>
-  </main>
-
-  <script src="./common.js"></script>
-  <script src="./dashboard.js"></script>
+<script src="{% static 'mindable/dashboard.js' %}"></script>
 </body>
 </html>
 
