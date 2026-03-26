@@ -1,6 +1,4 @@
-
-Copy
-
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,11 +7,11 @@ Copy
 <title>MindAble – Sign Up / Log In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link rel="stylesheet" href="signup.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="{% static 'signup.css' %}"/>
 </head>
 <body>
-<script src="signup.js"></script>
+ <script src="{% static 'signup.js' %}"></script>
 <!-- Background auras -->
 <div class="bg">
   <div class="aura aura-1"></div>
@@ -53,12 +51,6 @@ Copy
     </h1>
  
     <p class="left-sub">We match your unique strengths with the right opportunities. Build your Workplace Passport, and let our AI find jobs that truly fit you.</p>
- 
-    <div class="stats">
-      <div class="stat"><span class="stat-num">2,400+</span><span class="stat-label">Jobs Matched</span></div>
-      <div class="stat"><span class="stat-num">98%</span><span class="stat-label">Satisfaction</span></div>
-      <div class="stat"><span class="stat-num">500+</span><span class="stat-label">Employers</span></div>
-    </div>
  
     <div class="features-list">
       <div class="feat">
