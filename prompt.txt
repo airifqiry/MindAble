@@ -1,0 +1,57 @@
+Read AGENT.md
+
+You are building frontend pages for MindAble — an AI-powered job platform for neurodivergent people. The UI must feel calm, safe, and low-stimulation at all times. No aggressive animations, no flashing elements, no dense cluttered layouts.
+
+Before writing any code, read the existing files in the frontend folder for information. Every design decision in those files is the source of truth. Match them exactly — same CSS variables, same fonts, same aura blobs, same nav, same glass cards, same button styles, same scroll reveal pattern.
+
+---
+
+## Pages to build
+
+### 1. User Homepage — `dashboard.html`
+The first thing the user sees after logging in. Should feel like a calm personal hub.
+- Greet the user by name: "Welcome back, [Name]"
+- A summary card showing their Profile completion status with a progress indicator
+- Three quick-action cards linking to: Job Listings, Interview Prep, Edit Profile
+- A small "Your energy today" widget — a simple low/medium/high selector that remembers their setting and adjusts their experience
+- Keep it spacious. No walls of text. This page should feel like taking a breath.
+
+### 2. Job Listings — `jobs.html`
+The main job feed. Calm, scannable, never overwhelming.
+- A simple filter bar at the top: Remote / Hybrid / In-person toggles, and an energy level filter (low / medium / high demand)
+- Job cards in a single-column feed. Each card shows: job title, company, one-line description, 2–3 small tag chips (e.g. "Async", "No cold calls", "Quiet office"), and an "View role" button
+- A subtle toxicity warning label on cards that contain flagged content — not alarming, just a small visible indicator
+- A "Not for me" dismiss button on each card — no confirmation dialog, just a smooth fade out
+- No infinite scroll. Paginate with a simple "Load more" button at the bottom.
+
+### 3. Interview Prep Chatbot — `prep.html`
+A focused, distraction-free chat interface.
+- Clean two-column layout: a narrow left sidebar listing practice topics (e.g. "Tell me about yourself", "Strengths & challenges", "Workplace needs"), and a main chat area on the right
+- Chat bubbles: user messages align right with a subtle gradient background, AI messages align left on a glass card
+- A text input at the bottom with a send button — no bells, no whistles
+- A small header above the chat that shows the current topic and a "Change topic" link
+- Typing indicator (three animated dots) while the AI is responding
+- Keep the tone in placeholder text and labels warm and encouraging, not clinical
+
+### 4. Navigation Dropdown — add to every page
+Replace the current flat nav links with a dropdown menu that lets the user switch between all pages.
+- Trigger: clicking the current nav links area opens a soft dropdown panel
+- The dropdown sits below the nav bar, glass background, rounded corners, subtle shadow — consistent with the existing card style
+- Links inside: Home, Job Listings, Interview Prep, Profile, Log out
+- Active page is highlighted with the purple gradient text
+- Closes on outside click or pressing Escape
+- On mobile the dropdown becomes a full-width panel
+
+---
+
+## Hard rules — do not break these
+
+- Vanilla HTML, CSS, and JS only. No frameworks, no libraries.
+- Every page must have the aura background blobs, the standard nav, and the scroll reveal observer — copy them exactly from the existing files.
+- All colours must come from the existing CSS variables. Do not introduce any new colour values.
+- No inline styles except for genuinely dynamic values set by JS.
+- No placeholder-only inputs — every input needs a visible label.
+- Every interactive element needs `:hover` and `:focus-visible` states.
+- Fonts are Space Grotesk (headings) and DM Sans (body) — no others.
+- Animations must be subtle. Nothing that pulses repeatedly in the user's face, nothing that moves fast, nothing that demands attention.
+- The overall feeling of every page must be: calm, clear, in control.
