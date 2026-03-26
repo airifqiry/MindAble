@@ -5,5 +5,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
     path('', include('mindable.mindable_app.urls')),
+    path('api-auth/', include('rest_framework.urls')),
 ]
 
