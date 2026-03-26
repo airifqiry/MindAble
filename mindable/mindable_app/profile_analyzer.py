@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 import anthropic
-from prompts import (
+from mindable.mindable_app.prompts import (
     PROFILE_ANALYSIS_MAX_TOTAL_TOKENS,
     PROFILE_ANALYSIS_MODEL,
     PROFILE_ANALYSIS_RETRY_SUFFIX,
