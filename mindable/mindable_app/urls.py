@@ -10,4 +10,5 @@ urlpatterns = [
     path('passport/step3/', views.passport_step3, name='passport_step3'),
     path('passport/step4/', views.passport_step4, name='passport_step4'),
     path('api/jobs/', include('jobs.urls')),
+    path('api/feedback/', include('feedback.urls')),
 ]
