@@ -1,6 +1,6 @@
 from django import forms
-from django.contrib.auth.models import User
 from django.contrib.auth.forms import AuthenticationForm
+from .models import User, WorkplacePassport  # fix import to use your custom User
 
 class RegisterForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput)
@@ -21,3 +21,41 @@ class RegisterForm(forms.ModelForm):
 
 class LoginForm(AuthenticationForm):
     pass
+
+class PassportStep1Form(forms.Form):
+    """Skills & Experience"""
+    skills = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I am good at focused research, writing clearly, working independently...'}),
+        label="What are you good at?"
+    )
+    experience_summary = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'e.g. I have 2 years experience in data entry and customer support...'}),
+        label="Briefly describe your work experience (gaps are completely fine)",
+        required=False
+    )
+
+class PassportStep2Form(forms.Form):
+    """Neurotype"""
+    neurotype = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'e.g. ADHD, Autism, Anxiety, Depression...'}),
+        label="What condition(s) do you manage? (this stays private and helps us filter jobs for you)",
+        required=False
+    )
+
+class PassportStep3Form(forms.Form):
+    """Disadvantages / challenges"""
+    disadvantages = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I struggle with phone calls, open offices, strict deadlines...'}),
+        label="What situations or tasks are harder for you?"
+    )
+
+class PassportStep4Form(forms.Form):
+    """Success Enablers / accommodations"""
+    success_enablers = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. Written instructions, noise-cancelling headphones, flexible hours, remote work...'}),
+        label="What do you need in place to do your best work?"
+    )
+    resume_pdf = forms.FileField(
+        required=False,
+        label="Upload your CV (optional)"
+    )
