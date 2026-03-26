@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.postgres.fields import ArrayField
 
 class User(AbstractUser):
     is_job_seeker = models.BooleanField(default=True)
@@ -22,3 +23,18 @@ class WorkplaceProfile(models.Model):
 
     def __str__(self):
         return f"Profile: {self.user.username}"
+    
+class RejectedJob(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="rejected_jobs",
+    )
+    job_id = models.CharField(max_length=100)
+    skills_embedding = ArrayField(models.FloatField(), size=384)
+    needs_embedding = ArrayField(models.FloatField(), size=384)
+    reason = models.TextField(null=True, blank=True)
+    rejected_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "job_id")
