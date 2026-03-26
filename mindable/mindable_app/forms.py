@@ -1,10 +1,18 @@
 from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
-from .models import User, WorkplacePassport  # fix import to use your custom User
+# This imports the model you specifically built for the database
+from users.models import WorkplaceProfile 
+
+User = get_user_model()
+
+class LoginForm(AuthenticationForm):
+    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}))
+    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}))
 
 class RegisterForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput)
-    confirm_password = forms.CharField(widget=forms.PasswordInput)
+    password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': 'Password'}))
+    confirm_password = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': 'Confirm Password'}))
 
     class Meta:
         model = User
@@ -15,47 +23,37 @@ class RegisterForm(forms.ModelForm):
         p1 = cleaned_data.get('password')
         p2 = cleaned_data.get('confirm_password')
         if p1 and p2 and p1 != p2:
-            raise forms.ValidationError("Passwords do not match.")
+            raise forms.ValidationError("Passwords do not match")
         return cleaned_data
 
+# --- The 4 Steps of the Workplace Profile (Passport) ---
+# These match the fields you created in your WorkplaceProfile model
 
-class LoginForm(AuthenticationForm):
-    pass
+class PassportStep1Form(forms.ModelForm):
+    class Meta:
+        model = WorkplaceProfile
+        fields = ['skills', 'experience_summary']
+        widgets = {
+            'skills': forms.Textarea(attrs={'placeholder': 'What are you great at?'}),
+            'experience_summary': forms.Textarea(attrs={'placeholder': 'Tell us about your background.'}),
+        }
 
-class ProfileStep1Form(forms.Form):
-    """Skills & Experience"""
-    skills = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I am good at focused research, writing clearly, working independently...'}),
-        label="What are you good at?"
-    )
-    experience_summary = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'e.g. I have 2 years experience in data entry and customer support...'}),
-        label="Briefly describe your work experience (gaps are completely fine)",
-        required=False
-    )
+class PassportStep2Form(forms.ModelForm):
+    class Meta:
+        model = WorkplaceProfile
+        fields = ['mental_disability']
+        widgets = {
+            'mental_disability': forms.Textarea(attrs={'placeholder': 'Describe your neurotype or condition in your own words.'}),
+        }
 
-class ProfileStep2Form(forms.Form):
-    """Neurotype"""
-    neurotype = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'e.g. ADHD, Autism, Anxiety, Depression...'}),
-        label="What condition(s) do you manage? (this stays private and helps us filter jobs for you)",
-        required=False
-    )
+class PassportStep3Form(forms.ModelForm):
+    class Meta:
+        model = WorkplaceProfile
+        fields = ['dealbreakers']
+        help_text = "What environments or tasks should we filter out for you?"
 
-class ProfileStep3Form(forms.Form):
-    """Disadvantages / challenges"""
-    disadvantages = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I struggle with phone calls, open offices, strict deadlines...'}),
-        label="What situations or tasks are harder for you?"
-    )
-
-class ProfileStep4Form(forms.Form):
-    """Success Enablers / accommodations"""
-    success_enablers = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. Written instructions, noise-cancelling headphones, flexible hours, remote work...'}),
-        label="What do you need in place to do your best work?"
-    )
-    resume_pdf = forms.FileField(
-        required=False,
-        label="Upload your CV (optional)"
-    )
+class PassportStep4Form(forms.ModelForm):
+    class Meta:
+        model = WorkplaceProfile
+        fields = ['success_enablers']
+        help_text = "What tools or accommodations help you thrive?"
