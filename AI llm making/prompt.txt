@@ -1,0 +1,18 @@
+You are an AI engineer working on a project called MindAble, a job-matching platform for people with mental disabilities such as autism, ADHD, depression, and dyslexia. You are responsible for the LLM and language processing layer of the application.
+Build the following three Python modules:
+1. cv_analyzer.py
+A function called analyze_cv(cv_text: str) -> dict that sends the raw CV text to the Anthropic API using the claude-sonnet-4-6 model and extracts a structured JSON profile. The profile must contain: skills (list of strings), preferred_environment (string), communication_style (string), limitations (list of strings), accommodations_needed (list of strings), and work_values (list of strings). If a field cannot be determined from the CV, set it to null. Never invent information. Validate the output using a Pydantic model before returning. Use temperature 0.2.
+2. description_rewriter.py
+A function called rewrite_job_description(job_text: str) -> str that sends a raw job listing to the Anthropic API and rewrites it in plain, accessible language suitable for people with cognitive disabilities. The rewritten version must use short sentences of maximum 15 words, contain no jargon, highlight the three most important things about the role at the top, include a short typical day section, and end with a warm encouraging closing line. Use temperature 0.2.
+3. interview_chatbot.py
+A function called chat_interview_response(user_message: str, cv_profile: dict, job_listing: str, conversation_history: list) -> str that takes the user's message, their CV profile, the target job listing, and the full conversation history, and returns the assistant's next response. The chatbot must ask one question at a time, never overwhelm the user, give feedback gently without words like wrong or incorrect, and keep responses under 4 sentences. Use temperature 0.7.
+4. prompts.py
+All prompt templates must live in this file as constants. No prompt strings should appear in the other files.
+General rules:
+
+Load the Anthropic API key from an environment variable called ANTHROPIC_API_KEY using python-dotenv
+Never hardcode the API key
+Add full docstrings and type hints to every function
+Catch all API exceptions and raise clean descriptive errors
+Sanitize all user input before inserting it into a prompt to prevent prompt injection
+Write a pytest test for each function in a tests/ folder, mocking the Anthropic API call so no real tokens are consumed
