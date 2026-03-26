@@ -22,7 +22,7 @@ class RegisterForm(forms.ModelForm):
 class LoginForm(AuthenticationForm):
     pass
 
-class PassportStep1Form(forms.Form):
+class ProfileStep1Form(forms.Form):
     """Skills & Experience"""
     skills = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I am good at focused research, writing clearly, working independently...'}),
@@ -34,7 +34,7 @@ class PassportStep1Form(forms.Form):
         required=False
     )
 
-class PassportStep2Form(forms.Form):
+class ProfileStep2Form(forms.Form):
     """Neurotype"""
     neurotype = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'e.g. ADHD, Autism, Anxiety, Depression...'}),
@@ -42,14 +42,14 @@ class PassportStep2Form(forms.Form):
         required=False
     )
 
-class PassportStep3Form(forms.Form):
+class ProfileStep3Form(forms.Form):
     """Disadvantages / challenges"""
     disadvantages = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. I struggle with phone calls, open offices, strict deadlines...'}),
         label="What situations or tasks are harder for you?"
     )
 
-class PassportStep4Form(forms.Form):
+class ProfileStep4Form(forms.Form):
     """Success Enablers / accommodations"""
     success_enablers = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'e.g. Written instructions, noise-cancelling headphones, flexible hours, remote work...'}),

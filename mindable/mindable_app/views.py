@@ -45,22 +45,20 @@ def logout_view(request):
 
 
 @login_required
-def passport_step4(request):
-    if hasattr(request.user, 'passport'):
+def profile_step4(request):
+    if hasattr(request.user, 'profile'):
         return redirect('basecamp')
-    if 'passport_step3' not in request.session:
-        return redirect('passport_step1')
-
+    if 'profile_step3' not in request.session:
+        return redirect('profile_step1')
     if request.method == 'POST':
-        form = PassportStep4Form(request.POST, request.FILES)
+        form = ProfileStep4Form(request.POST, request.FILES)
         if form.is_valid():
             # Collect all session data
-            step1 = request.session.get('passport_step1', {})
-            step2 = request.session.get('passport_step2', {})
-            step3 = request.session.get('passport_step3', {})
-
-            # Build the passport object and save to DB
-            passport = WorkplacePassport(
+            step1 = request.session.get('profile_step1', {})
+            step2 = request.session.get('profile_step2', {})
+            step3 = request.session.get('profile_step3', {})
+            # Build the profile object and save to DB
+            profile = WorkplaceProfile(
                 user=request.user,
                 skills=step1.get('skills', ''),
                 experience_summary=step1.get('experience_summary', ''),
@@ -71,16 +69,12 @@ def passport_step4(request):
                 dealbreakers=step3.get('disadvantages', '').split(','),
             )
             if form.cleaned_data.get('resume_pdf'):
-                passport.resume_pdf = form.cleaned_data['resume_pdf']
-
-            passport.save()
-
+                profile.resume_pdf = form.cleaned_data['resume_pdf']
+            profile.save()
             # Clean up session
-            for key in ['passport_step1', 'passport_step2', 'passport_step3']:
+            for key in ['profile_step1', 'profile_step2', 'profile_step3']:
                 request.session.pop(key, None)
-
             return redirect('basecamp')
     else:
-        form = PassportStep4Form()
-
-    return render(request, 'passport/step4.html', {'form': form, 'step': 4})
+        form = ProfileStep4Form()
+    return render(request, 'profile/step4.html', {'form': form, 'step': 4})
