@@ -12,7 +12,7 @@ from typing import Final
 from dotenv import load_dotenv
 import anthropic
 
-from mindable.prompts import (
+from mindable.mindable_app.prompts import (
     DESCRIPTION_REWRITER_MODEL,
     DESCRIPTION_REWRITER_SYSTEM,
     DESCRIPTION_REWRITER_USER,

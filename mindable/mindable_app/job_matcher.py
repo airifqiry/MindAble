@@ -10,7 +10,7 @@ from typing import Final
 from dotenv import load_dotenv
 import anthropic
 
-from mindable.prompts import JOB_MATCHER_MODEL, JOB_MATCHER_SYSTEM
+from mindable.mindable_app.prompts import JOB_MATCHER_MODEL, JOB_MATCHER_SYSTEM
 
 load_dotenv()
 
