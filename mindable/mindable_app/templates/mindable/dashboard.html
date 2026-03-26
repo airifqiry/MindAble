@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MindAble – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="./signup.css"/>
+  <link rel="stylesheet" href="./common.css"/>
+  <link rel="stylesheet" href="./dashboard.css"/>
+</head>
+<body data-active-page="home">
+  <!-- Background auras -->
+  <div class="bg">
+    <div class="aura aura-1"></div>
+    <div class="aura aura-2"></div>
+    <div class="aura aura-3"></div>
+  </div>
+
+  <div id="nav-wrapper">
+    <nav>
+      <a class="nav-brand" href="./dashboard.html">
+        <div class="nav-logo">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </div>
+        MindAble
+      </a>
+
+      <div class="nav-links">
+        <a
+          href="#"
+          class="nav-menu-trigger"
+          id="nav-menu-trigger"
+          aria-haspopup="menu"
+          aria-controls="nav-menu-panel"
+          aria-expanded="false"
+        >
+          Menu
+        </a>
+      </div>
+    </nav>
+
+    <div id="nav-menu-panel" hidden>
+      <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
+      <a href="./jobs.html" data-page="jobs" class="nav-menu-link">Job Listings</a>
+      <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
+      <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
+      <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+    </div>
+  </div>
+
+  <main class="mf-page">
+    <section class="mf-hero reveal">
+      <div class="mf-kicker">Welcome back, <span id="user-name">Alex</span></div>
+      <h1 class="mf-title">Your calm basecamp</h1>
+      <p class="mf-sub">
+        A gentle place to find roles that fit, practice interviews, and keep your workplace passport up to date.
+      </p>
+    </section>
+
+    <section class="mf-grid">
+      <div class="mf-card reveal" id="profile">
+        <div class="mf-card-head">
+          <div class="mf-card-title">Profile completion</div>
+          <span class="mf-pill" aria-hidden="true">Private + protective</span>
+        </div>
+
+        <div class="mf-progress">
+          <div class="mf-progress-bar" aria-label="Profile completion progress">
+            <div class="mf-progress-fill" id="profile-progress-fill"></div>
+          </div>
+          <div class="mf-progress-meta">
+            <span>Your progress</span>
+            <strong id="profile-percent">65%</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="mf-card reveal">
+        <div class="mf-card-head">
+          <div class="mf-card-title">Your energy today</div>
+          <span class="mf-pill" aria-hidden="true">Low stress, better matches</span>
+        </div>
+
+        <div class="mf-energy-options" role="radiogroup" aria-label="Your energy today">
+          <label class="mf-energy-option">
+            <input type="radio" name="energy" value="low"/>
+            <span class="mf-energy-pill">Low</span>
+          </label>
+          <label class="mf-energy-option">
+            <input type="radio" name="energy" value="medium"/>
+            <span class="mf-energy-pill">Medium</span>
+          </label>
+          <label class="mf-energy-option">
+            <input type="radio" name="energy" value="high"/>
+            <span class="mf-energy-pill">High</span>
+          </label>
+        </div>
+
+        <div class="mf-energy-note" id="energy-note"></div>
+      </div>
+    </section>
+
+    <section class="mf-actions">
+      <a class="mf-action reveal" href="./jobs.html" aria-label="Go to Job Listings">
+        <div class="mf-action-left">
+          <div class="mf-action-title">Job Listings</div>
+          <div class="mf-action-sub">Clean, scannable roles matched to you</div>
+        </div>
+        <div class="mf-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+      </a>
+
+      <a class="mf-action reveal" href="./prep.html" aria-label="Go to Interview Prep">
+        <div class="mf-action-left">
+          <div class="mf-action-title">Interview Prep</div>
+          <div class="mf-action-sub">Warm practice with a calm coach</div>
+        </div>
+        <div class="mf-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+      </a>
+
+      <a class="mf-action reveal" href="./dashboard.html#profile" aria-label="Edit Profile">
+        <div class="mf-action-left">
+          <div class="mf-action-title">Edit Profile</div>
+          <div class="mf-action-sub">Update what helps you thrive</div>
+        </div>
+        <div class="mf-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 21v-4l10.5-10.5 4 4L8 21H4z"/><path d="M13.5 6.5l4 4"/></svg>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <script src="./common.js"></script>
+  <script src="./dashboard.js"></script>
+</body>
+</html>
+
