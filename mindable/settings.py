@@ -90,7 +90,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'users', # Your app
+    'rest_framework',
+    'users',
+    'mindable.mindable_app',
 ]
 
 # 2. Point to your custom User class
@@ -102,7 +104,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'mindable_db',
         'USER': 'postgres',      
-        'PASSWORD': 'mindable123', 
+        'PASSWORD': 'Ra037210?', 
         'HOST': '127.0.0.1',
         'PORT': '5432',
     }
