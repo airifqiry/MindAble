@@ -7,14 +7,14 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 import anthropic
 from prompts import (
-    CV_ANALYSIS_MAX_TOTAL_TOKENS,
-    CV_ANALYSIS_MODEL,
-    CV_ANALYSIS_RETRY_SUFFIX,
-    CV_ANALYSIS_SYSTEM,
-    CV_ANALYSIS_USER,
+    PROFILE_ANALYSIS_MAX_TOTAL_TOKENS,
+    PROFILE_ANALYSIS_MODEL,
+    PROFILE_ANALYSIS_RETRY_SUFFIX,
+    PROFILE_ANALYSIS_SYSTEM,
+    PROFILE_ANALYSIS_USER,
 )
 load_dotenv()
-class CVProfileModel(BaseModel):
+class ProfileModel(BaseModel):
     
     skills: list[str] | None = Field(default=None)
     preferred_environment: str | None = Field(default=None)
@@ -31,7 +31,7 @@ def _get_client() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=key)
 def _sanitize_for_prompt(text: str) -> str:
     if not isinstance(text, str):
-        raise TypeError("cv_text must be a string")
+        raise TypeError("profile_text must be a string")
     cleaned = text.replace("\x00", "").strip()
     patterns: tuple[re.Pattern[str], ...] = (
         re.compile(r"(?im)^\s*ignore\s+(all\s+)?(previous|prior)\s+instructions?\b.*$"),
@@ -50,22 +50,20 @@ def _sanitize_for_prompt(text: str) -> str:
     out = "\n".join(kept_lines).strip()
     return out
 def _estimate_tokens(text: str) -> int:
-   
     if not text:
         return 0
     return max(1, len(text) // 4)
-def _truncate_cv_text_for_budget(cv_text: str) -> str:
-    system_tokens = _estimate_tokens(CV_ANALYSIS_SYSTEM)
-    user_prefix_tokens = _estimate_tokens(CV_ANALYSIS_USER.replace("{cv_text}", ""))
-    overhead = system_tokens + user_prefix_tokens + 50 
-    remaining_tokens = CV_ANALYSIS_MAX_TOTAL_TOKENS - overhead
+def _truncate_profile_text_for_budget(profile_text: str) -> str:
+    system_tokens = _estimate_tokens(PROFILE_ANALYSIS_SYSTEM)
+    user_prefix_tokens = _estimate_tokens(PROFILE_ANALYSIS_USER.replace("{profile_text}", ""))
+    overhead = system_tokens + user_prefix_tokens + 50
+    remaining_tokens = PROFILE_ANALYSIS_MAX_TOTAL_TOKENS - overhead
     if remaining_tokens <= 0:
-       
-        return cv_text[:800]
+        return profile_text[:800]
     max_chars = remaining_tokens * 4
-    if len(cv_text) <= max_chars:
-        return cv_text
-    return cv_text[:max_chars]
+    if len(profile_text) <= max_chars:
+        return profile_text
+    return profile_text[:max_chars]
 def _extract_json_object(raw: str) -> dict[str, Any]:
     text = raw.strip()
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.IGNORECASE)
@@ -79,46 +77,41 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
         raise ValueError("Model JSON root must be an object")
     return data
 def _message_text(response: anthropic.types.Message) -> str:
-   
     parts: list[str] = []
     for block in response.content:
         if getattr(block, "type", None) == "text":
             parts.append(block.text)
     return "".join(parts).strip()
-def analyze_cv(cv_text: str) -> dict[str, Any]:
-   
-    sanitized = _sanitize_for_prompt(cv_text)
-    truncated_cv = _truncate_cv_text_for_budget(sanitized)
-    user_prompt = CV_ANALYSIS_USER.format(cv_text=truncated_cv)
+def analyze_profile(profile_text: str) -> dict[str, Any]:
+    sanitized = _sanitize_for_prompt(profile_text)
+    truncated_profile = _truncate_profile_text_for_budget(sanitized)
+    user_prompt = PROFILE_ANALYSIS_USER.format(profile_text=truncated_profile)
     client = _get_client()
     last_error: Exception | None = None
     for attempt in range(2):
-        
-        content = user_prompt + (CV_ANALYSIS_RETRY_SUFFIX if attempt == 1 else "")
+        content = user_prompt + (PROFILE_ANALYSIS_RETRY_SUFFIX if attempt == 1 else "")
         try:
             message = client.messages.create(
-                model=CV_ANALYSIS_MODEL,
+                model=PROFILE_ANALYSIS_MODEL,
                 max_tokens=1024,
                 temperature=0.2,
-                system=CV_ANALYSIS_SYSTEM,
+                system=PROFILE_ANALYSIS_SYSTEM,
                 messages=[{"role": "user", "content": content}],
             )
             text = _message_text(message)
             parsed = _extract_json_object(text)
-            model = CVProfileModel.model_validate(parsed)
+            model = ProfileModel.model_validate(parsed)
             return model.model_dump()
         except anthropic.APIError as exc:
-            
             raise RuntimeError(
-                "CV analysis failed because the Anthropic API request did not succeed."
+                "Profile analysis failed because the Anthropic API request did not succeed."
             ) from exc
         except (ValidationError, ValueError) as exc:
             last_error = exc
             continue
         except Exception as exc:
-           
             last_error = exc
             continue
     raise ValueError(
-        "CV analysis output could not be validated as the expected schema."
+        "Profile analysis output could not be validated as the expected schema."
     ) from last_error
