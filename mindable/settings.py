@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'users',
     'jobs',
+    'feedback',
     'mindable.mindable_app',
 ]
 
