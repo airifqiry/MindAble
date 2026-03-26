@@ -3,6 +3,7 @@ from __future__ import annotations
 CV_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
 DESCRIPTION_REWRITER_MODEL: str = "claude-sonnet-4-6"
 INTERVIEW_CHATBOT_MODEL: str = "claude-sonnet-4-6"
+JOB_MATCHER_MODEL = "claude-haiku-4-5-20251001"
 CV_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 REWRITER_MAX_TOTAL_TOKENS: int = 1500
 INTERVIEW_MAX_TOTAL_TOKENS: int = 4000
@@ -53,7 +54,7 @@ INTERVIEW_CHATBOT_USER_CONTEXT: str = (
     "{job_listing}"
 )
 
-CV_ANALYSIS_SYSTEM: str = (
+PROFILE_ANALYSIS_SYSTEM: str = (
     "You extract structured job-relevant information from a CV or resume.\n"
     "Return a single JSON object only. No markdown. No extra text.\n"
     "Use exactly these keys:\n"
@@ -79,7 +80,7 @@ CV_ANALYSIS_SYSTEM: str = (
     "- Do not frame disabilities as deficits.\n"
 )
 
-CV_ANALYSIS_USER: str = (
+PROFILE_ANALYSIS_USER: str = (
     "CV text between <cv> and </cv>:\n"
     "\n"
     "<cv>\n"
@@ -87,7 +88,19 @@ CV_ANALYSIS_USER: str = (
     "</cv>"
 )
 
-CV_ANALYSIS_RETRY_SUFFIX: str = (
+JOB_MATCHER_SYSTEM = (
+    "You are a job matching assistant for developers with cognitive disabilities. "
+    "Find real, active job postings that match the developer's skills. "
+    "Make sure the job listings you return are currently active and open to applications. "
+    "The developer may have indicated a preferred work environment, communication style, limitations, accommodations needed, and work values in their profile. "
+    "Use this information to find jobs that are not only a good skills match, but also a good overall fit for the developer. "
+    "Make sure the work enviorment is neurodivergent friendly."
+    "Always make sure the job links are not a fake or scam, especially when you're suggesting them to someone with cognitive disabilities who may be more vulnerable to scams. "
+    "Use plain, simple language. Short sentences. No jargon. "
+    "Always include a direct link to apply for each job."
+)
+
+PROFILE_ANALYSIS_RETRY_SUFFIX: str = (
     "Your previous output failed validation.\n"
     "Output again a single JSON object only.\n"
     "No markdown. All required keys must be present.\n"
