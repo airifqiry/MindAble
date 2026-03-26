@@ -35,6 +35,7 @@ ALLOWED_HOSTS = []
 
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -49,7 +50,7 @@ ROOT_URLCONF = 'mindable.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'mindable/templates'],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -83,6 +84,7 @@ INSTALLED_APPS = [
     'jobs',
     'feedback',
     'mindable.mindable_app',
+    'corsheaders',
 ]
 
 # 2. Point to your custom User class
@@ -135,12 +137,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS={
-    BASE_DIR/'static'
-}
+# Static files
+STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / "static"] 
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CORS
+CORS_ALLOW_ALL_ORIGINS = True

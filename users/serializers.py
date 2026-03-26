@@ -1,5 +1,11 @@
+
 from rest_framework import serializers
-from .models import User, WorkplaceProfileSerializer
+from .models import User, WorkplaceProfile 
+
+class WorkplaceProfileSerializer(serializers.ModelSerializer): 
+    class Meta:
+        model = WorkplaceProfile
+        fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
     profile = WorkplaceProfileSerializer(read_only=True)
