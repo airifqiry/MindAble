@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path,include
 from . import views
 
 urlpatterns = [
@@ -9,4 +9,5 @@ urlpatterns = [
     path('passport/step2/', views.passport_step2, name='passport_step2'),
     path('passport/step3/', views.passport_step3, name='passport_step3'),
     path('passport/step4/', views.passport_step4, name='passport_step4'),
+    path('api/jobs/', include('jobs.urls')),
 ]
