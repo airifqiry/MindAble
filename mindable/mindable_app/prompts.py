@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-CV_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
+PROFILE_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
 DESCRIPTION_REWRITER_MODEL: str = "claude-sonnet-4-6"
 INTERVIEW_CHATBOT_MODEL: str = "claude-sonnet-4-6"
 JOB_MATCHER_MODEL = "claude-haiku-4-5-20251001"
-CV_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
+PROFILE_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 REWRITER_MAX_TOTAL_TOKENS: int = 1500
 INTERVIEW_MAX_TOTAL_TOKENS: int = 4000
+PROFILE_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
+PROFILE_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 
 DESCRIPTION_REWRITER_SYSTEM: str = (
     "You rewrite job postings in plain, accessible language for readers with cognitive disabilities.\n"

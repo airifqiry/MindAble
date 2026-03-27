@@ -12,7 +12,7 @@ from .forms import (
 )
 from users.models import WorkplaceProfile
 
-# --- Authentication Views ---
+
 
 def register_view(request):
     if request.method == 'POST':
@@ -50,7 +50,7 @@ def logout_view(request):
     logout(request)
     return redirect('login')
 
-# --- Workplace Profile (Passport) Multi-Step Views ---
+
 
 @login_required
 def passport_step1(request):
