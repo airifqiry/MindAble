@@ -1,110 +1,76 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAble – Job Listings</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-
-  <link rel="stylesheet" href="./signup.css"/>
-  <link rel="stylesheet" href="./common.css"/>
-  <link rel="stylesheet" href="./jobs.css"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MindAble – Job Listings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="{% static 'mindable/jobs.css' %}"/>
 </head>
-<body data-active-page="jobs">
-  <div class="bg">
-    <div class="aura aura-1"></div>
-    <div class="aura aura-2"></div>
-    <div class="aura aura-3"></div>
+<body>
+
+<!-- ── Aura background ── -->
+<div class="bg-auras">
+  <div class="aura aura-1"></div>
+  <div class="aura aura-2"></div>
+  <div class="aura aura-3"></div>
+</div>
+
+<!-- ── NAV ── -->
+<nav id="navbar">
+  <a href="./home.html" class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    </div>
+    MindAble
+  </a>
+  <button class="nav-menu-btn" id="nav-menu-btn" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- ── NAV DROPDOWN PANEL ── -->
+<div id="nav-menu-panel" hidden>
+  <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
+  <a href="./jobs.html" data-page="jobs" class="nav-menu-link active">Job Listings</a>
+  <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
+  <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
+  <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+</div>
+
+<!-- ── PAGE ── -->
+<main class="page">
+
+  <div class="page-header">
+    <p class="page-eyebrow">Your matches</p>
+    <h1 class="page-title">Job Listings</h1>
+    <p class="page-sub">Curated for your profile — filtered before you even see them.</p>
   </div>
 
-  <div id="nav-wrapper">
-    <nav>
-      <a class="nav-brand" href="./dashboard.html">
-        <div class="nav-logo">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </div>
-        MindAble
-      </a>
-      <div class="nav-links">
-        <a
-          href="#"
-          class="nav-menu-trigger"
-          id="nav-menu-trigger"
-          aria-haspopup="menu"
-          aria-controls="nav-menu-panel"
-          aria-expanded="false"
-        >
-          Menu
-        </a>
-      </div>
-    </nav>
+  <p class="results-count"><span id="results-num">0</span> roles matched your profile</p>
 
-    <div id="nav-menu-panel" hidden>
-      <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
-      <a href="./jobs.html" data-page="jobs" class="nav-menu-link">Job Listings</a>
-      <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
-      <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
-      <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
-    </div>
+  <!-- ── JOB FEED ── -->
+  <div class="job-feed" id="job-feed">
+  </div><!-- /job-feed -->
+
+  <!-- Empty state -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">🌿</div>
+    <p class="empty-h">No roles yet</p>
+    <p class="empty-p">Once the backend is connected, your matched roles will appear here.</p>
   </div>
 
-  <main class="jobs-page">
-    <section class="jobs-top reveal">
-      <h1 class="jobs-title">Job listings</h1>
-      <p class="jobs-sub">
-        Filter by work mode and demand. Your energy preference automatically guides what shows first.
-      </p>
-    </section>
+  <!-- Load more -->
+  <div class="load-more-wrap" id="load-more-wrap" hidden>
+    <button class="btn-load-more" onclick="loadMore()">Load more roles</button>
+  </div>
 
-    <section class="filter-bar reveal" aria-label="Job filters">
-      <div class="filter-row">
-        <div class="filter-legend">Work mode</div>
-        <label class="filter-option">
-          <input type="checkbox" name="mode" value="Remote" checked/>
-          <span class="filter-pill">Remote</span>
-        </label>
-        <label class="filter-option">
-          <input type="checkbox" name="mode" value="Hybrid" checked/>
-          <span class="filter-pill">Hybrid</span>
-        </label>
-        <label class="filter-option">
-          <input type="checkbox" name="mode" value="In-person" checked/>
-          <span class="filter-pill">In-person</span>
-        </label>
-      </div>
+</main>
 
-      <div class="filter-row">
-        <div class="filter-legend">Energy demand</div>
-        <label class="filter-option">
-          <input type="radio" name="demand" value="low" checked/>
-          <span class="filter-pill">Low</span>
-        </label>
-        <label class="filter-option">
-          <input type="radio" name="demand" value="medium"/>
-          <span class="filter-pill">Medium</span>
-        </label>
-        <label class="filter-option">
-          <input type="radio" name="demand" value="high"/>
-          <span class="filter-pill">High</span>
-        </label>
-      </div>
-    </section>
-
-    <section class="job-feed" id="job-feed" aria-label="Job results">
-      <!-- cards injected by jobs.js -->
-    </section>
-
-    <div class="load-more-wrap">
-      <button type="button" class="btn-primary load-more-btn" id="load-more">
-        Load more
-      </button>
-    </div>
-  </main>
-
-  <script src="./common.js"></script>
-  <script src="./jobs.js"></script>
+<script src="{% static 'mindable/jobs.js' %}"></script>
 </body>
 </html>
 
