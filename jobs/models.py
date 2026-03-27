@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 
 
 class Company(models.Model):
@@ -38,6 +39,8 @@ class Job(models.Model):
     required_skills = models.JSONField(default=list, blank=True)
     # e.g. ["Python", "data entry", "writing"]
 
+    skills_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
+    needs_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     is_translated = models.BooleanField(default=False)
     # False until the AI pipeline has processed this job
 
