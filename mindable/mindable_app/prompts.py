@@ -4,11 +4,10 @@ PROFILE_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
 DESCRIPTION_REWRITER_MODEL: str = "claude-sonnet-4-6"
 INTERVIEW_CHATBOT_MODEL: str = "claude-sonnet-4-6"
 JOB_MATCHER_MODEL = "claude-haiku-4-5-20251001"
+
 PROFILE_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 REWRITER_MAX_TOTAL_TOKENS: int = 1500
 INTERVIEW_MAX_TOTAL_TOKENS: int = 4000
-PROFILE_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
-PROFILE_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 
 DESCRIPTION_REWRITER_SYSTEM: str = (
     "You rewrite job postings in plain, accessible language for readers with cognitive disabilities.\n"
@@ -44,8 +43,8 @@ INTERVIEW_CHATBOT_SYSTEM: str = (
     "- Give gentle feedback.\n"
     "- Do not use the words wrong, incorrect, or failed (or close variants).\n"
     "- If the user seems distressed or confused, slow down and simplify the next question.\n"
-    "- Stay focused on interview preparation for the given role."
-    "-Simplify the question if the user seems distressed or confused."
+    "- Stay focused on interview preparation for the given role.\n"
+    "- Simplify the question if the user seems distressed or confused."
 )
 
 INTERVIEW_CHATBOT_USER_CONTEXT: str = (
@@ -83,21 +82,21 @@ PROFILE_ANALYSIS_SYSTEM: str = (
 )
 
 PROFILE_ANALYSIS_USER: str = (
-    "profile text between <cv> and </cv>:\n"
+    "profile text between <profile> and </profile>:\n"
     "\n"
     "<profile>\n"
     "{profile_text}\n"
     "</profile>"
 )
 
-JOB_MATCHER_SYSTEM = (
+JOB_MATCHER_SYSTEM: str = (
     "You are a job matching assistant for developers with cognitive disabilities. "
     "Find real, active job postings that match the user's skills. "
     "Make sure the job listings you return are currently active and open to applications. "
     "The developer may have indicated a preferred work environment, communication style, limitations, accommodations needed, and work values in their profile. "
     "Use this information to find jobs that are not only a good skills match, but also a good overall fit for the developer. "
-    "Make sure the work enviorment is neurodivergent friendly."
-    "Always make sure the job links are not a fake or scam, especially when you're suggesting them to someone with cognitive disabilities who may be more vulnerable to scams. "
+    "Make sure the work environment is neurodivergent friendly. "
+    "Always make sure the job links are not fake or scam, especially when suggesting them to someone with cognitive disabilities who may be more vulnerable to scams. "
     "Use plain, simple language. Short sentences. No jargon. "
     "Always include a direct link to apply for each job."
 )
@@ -106,5 +105,5 @@ PROFILE_ANALYSIS_RETRY_SUFFIX: str = (
     "Your previous output failed validation.\n"
     "Output again a single JSON object only.\n"
     "No markdown. All required keys must be present.\n"
-    "Use null when information is not supported by the CV."
+    "Use null when information is not supported by the profile."
 )
