@@ -27,22 +27,18 @@ class Job(models.Model):
     job_type = models.CharField(max_length=20, choices=JOB_TYPE_CHOICES)
     external_url = models.URLField()
 
-    # --- AI translation fields (populated by scraper/AI pipeline) ---
     original_description = models.TextField()
     translated_title = models.CharField(max_length=255, blank=True)
     translated_tasks = models.JSONField(default=list, blank=True)
-    # e.g. ["Write weekly email updates", "Attend 1 meeting per week"]
 
     toxicity_warnings = models.JSONField(default=list, blank=True)
-    # e.g. ["Original post mentioned: 'must work under extreme pressure'"]
+ 
 
     required_skills = models.JSONField(default=list, blank=True)
-    # e.g. ["Python", "data entry", "writing"]
 
     skills_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     needs_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     is_translated = models.BooleanField(default=False)
-    # False until the AI pipeline has processed this job
 
     created_at = models.DateTimeField(auto_now_add=True)
 
