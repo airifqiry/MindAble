@@ -10,6 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from pathlib import Path
 
@@ -89,14 +93,18 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'users.User'
 
 # 3. The PostgreSQL Handshake
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+DEBUG = os.getenv('DEBUG') == 'True'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'mindable_db',
-        'USER': 'postgres',      
-        'PASSWORD': 'Ra037210?', 
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
 }
 
