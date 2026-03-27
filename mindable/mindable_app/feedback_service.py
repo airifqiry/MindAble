@@ -1,10 +1,10 @@
 from __future__ import annotations
+from users.models import RejectedJob
 
 from typing import List, Tuple
 from django.contrib.auth import get_user_model
 
 Embedding = List[float]
-User = get_user_model()
 
 
 def record_rejection(
@@ -15,8 +15,6 @@ def record_rejection(
     reason: str | None = None,
 ) -> None:
 
-
-    from mindable_app.models import RejectedJob
 
     already_exists = RejectedJob.objects.filter(
         user_id=user_id,
@@ -38,7 +36,6 @@ def record_rejection(
 def get_rejected_embeddings(
     user_id: int,
 ) -> List[Tuple[Embedding, Embedding]]:
-    from mindable_app.models import RejectedJob
 
     rejections = RejectedJob.objects.filter(
         user_id=user_id,
@@ -48,8 +45,6 @@ def get_rejected_embeddings(
 
 
 def clear_rejections(user_id: int) -> int:
-
-    from mindable_app.models import RejectedJob
 
     deleted_count, _ = RejectedJob.objects.filter(
         user_id=user_id,
