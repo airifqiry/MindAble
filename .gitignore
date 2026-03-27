@@ -139,4 +139,5 @@ GitHub.sublime-settings
 !.vscode/extensions.json 
 .history
 
-.DS_Store
+.DS_Store__pycache__/
+*.pyc
