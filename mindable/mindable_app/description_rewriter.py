@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
-import time
-from functools import lru_cache
 from typing import Final
 
 from dotenv import load_dotenv
@@ -18,6 +15,7 @@ from mindable.mindable_app.prompts import (
     DESCRIPTION_REWRITER_USER,
     REWRITER_MAX_TOTAL_TOKENS,
 )
+from mindable.mindable_app.claude_client import claude_messages_create, extract_text
 
 load_dotenv()
 
@@ -25,10 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 _CHARS_PER_TOKEN: Final[int] = 4
-
-
-_MAX_RETRIES: Final[int] = 3
-_RETRY_BASE_DELAY: Final[float] = 1.0  
 
 
 _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -89,52 +83,6 @@ def _truncate_job_text_for_budget(job_text: str) -> str:
     return job_text[:max_chars]
 
 
-@lru_cache(maxsize=1)
-def _get_client() -> anthropic.Anthropic:
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError(
-            "Missing ANTHROPIC_API_KEY. Set it in your environment or a .env file."
-        )
-    return anthropic.Anthropic(api_key=key)
-
-
-def _message_text(response: anthropic.types.Message) -> str:
-    parts: list[str] = []
-    for block in response.content:
-        if getattr(block, "type", None) == "text":
-            parts.append(block.text)
-    return "".join(parts).strip()
-
-
-def _call_with_retry(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
-    last_exc: Exception | None = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            return client.messages.create(**kwargs)
-        except anthropic.RateLimitError as exc:
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning("Rate limited; retrying in %.1fs (attempt %d/%d).", delay, attempt + 1, _MAX_RETRIES)
-            time.sleep(delay)
-        except anthropic.APIStatusError as exc:
-            if exc.status_code and exc.status_code < 500:
-                raise
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning("Server error %d; retrying in %.1fs (attempt %d/%d).", exc.status_code, delay, attempt + 1, _MAX_RETRIES)
-            time.sleep(delay)
-        except anthropic.APIConnectionError as exc:
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning("Connection error; retrying in %.1fs (attempt %d/%d).", delay, attempt + 1, _MAX_RETRIES)
-            time.sleep(delay)
-
-    raise RuntimeError(
-        "Job description rewriting failed after all retries."
-    ) from last_exc
-
-
 def rewrite_job_description(job_text: str) -> str:
     
     sanitized = _sanitize_for_prompt(job_text)
@@ -142,17 +90,14 @@ def rewrite_job_description(job_text: str) -> str:
 
     user_prompt = DESCRIPTION_REWRITER_USER.format(job_text=truncated)
 
-    client = _get_client()
-
-    response = _call_with_retry(
-        client,
+    response = claude_messages_create(
         model=DESCRIPTION_REWRITER_MODEL,
         max_tokens=1024,
         system=DESCRIPTION_REWRITER_SYSTEM,
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    out = _message_text(response)
+    out = extract_text(response)
     if not out:
         raise ValueError("Job description rewriting produced an empty response.")
 

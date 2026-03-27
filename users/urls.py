@@ -12,9 +12,13 @@ urlpatterns = [
     path('home/', views.home, name='home'),
     path('jobs/', views.jobs, name='jobs'),
     path('prep/', views.prep, name='prep'),
+    path('chat/', views.chat, name='chat'),
+    path('chat/api/', views.chat_api, name='chat_api'),
+    path('chat/history/', views.chat_history, name='chat_history'),
     path('onboarding/', views.onboarding, name='onboarding'),
     path('basecamp/', views.basecamp, name='basecamp'),
 
     # API (authenticated)
     path('api/profile/', views.profile_upsert_api, name='api_profile_upsert'),
+    path('api/prep/chat/', views.prep_chat_api, name='api_prep_chat'),
 ]

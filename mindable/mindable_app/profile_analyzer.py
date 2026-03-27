@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-import os
 import re
 from typing import Any
 from dotenv import load_dotenv
@@ -13,22 +12,18 @@ from mindable.mindable_app.prompts import (
     PROFILE_ANALYSIS_SYSTEM,
     PROFILE_ANALYSIS_USER,
 )
+from mindable.mindable_app.claude_client import claude_messages_create, extract_text
 load_dotenv()
 class ProfileModel(BaseModel):
     
     skills: list[str] | None = Field(default=None)
+    technical_skills: list[str] | None = Field(default=None)
+    general_skills: list[str] | None = Field(default=None)
     preferred_environment: str | None = Field(default=None)
     communication_style: str | None = Field(default=None)
     limitations: list[str] | None = Field(default=None)
     accommodations_needed: list[str] | None = Field(default=None)
     work_values: list[str] | None = Field(default=None)
-def _get_client() -> anthropic.Anthropic:
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError(
-            "Missing ANTHROPIC_API_KEY. Set it in the environment or a .env file."
-        )
-    return anthropic.Anthropic(api_key=key)
 def _sanitize_for_prompt(text: str) -> str:
     if not isinstance(text, str):
         raise TypeError("profile_text must be a string")
@@ -76,28 +71,21 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Model JSON root must be an object")
     return data
-def _message_text(response: anthropic.types.Message) -> str:
-    parts: list[str] = []
-    for block in response.content:
-        if getattr(block, "type", None) == "text":
-            parts.append(block.text)
-    return "".join(parts).strip()
 def analyze_profile(profile_text: str) -> dict[str, Any]:
     sanitized = _sanitize_for_prompt(profile_text)
     truncated_profile = _truncate_profile_text_for_budget(sanitized)
     user_prompt = PROFILE_ANALYSIS_USER.format(profile_text=truncated_profile)
-    client = _get_client()
     last_error: Exception | None = None
     for attempt in range(2):
         content = user_prompt + (PROFILE_ANALYSIS_RETRY_SUFFIX if attempt == 1 else "")
         try:
-            message = client.messages.create(
+            message = claude_messages_create(
                 model=PROFILE_ANALYSIS_MODEL,
                 max_tokens=1024,
                 system=PROFILE_ANALYSIS_SYSTEM,
                 messages=[{"role": "user", "content": content}],
             )
-            text = _message_text(message)
+            text = extract_text(message)
             parsed = _extract_json_object(text)
             model = ProfileModel.model_validate(parsed)
             return model.model_dump()

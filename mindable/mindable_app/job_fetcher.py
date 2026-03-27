@@ -4,12 +4,47 @@ import json
 import logging
 import urllib.request
 import urllib.parse
+import urllib.error
+from itertools import islice
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _HIMALAYAS_SEARCH_URL = "https://himalayas.app/jobs/api/search"
 _ARBEITNOW_URL = "https://www.arbeitnow.com/api/job-board-api"
+_REMOTEOK_URL = "https://remoteok.com/api"
+_REMOTIVE_URL = "https://remotive.com/api/remote-jobs"
+
+
+def _build_search_queries(skills: list[str]) -> list[str]:
+    cleaned = [s.strip().lower() for s in skills if s and s.strip()]
+    cleaned = list(dict.fromkeys(cleaned))
+    if not cleaned:
+        return []
+
+    queries: list[str] = []
+    # Prioritize specific terms first.
+    for term in cleaned[:8]:
+        queries.append(term)
+
+    # Add small combos to broaden retrieval without overfitting.
+    it = iter(cleaned[:6])
+    while True:
+        pair = list(islice(it, 2))
+        if len(pair) < 2:
+            break
+        queries.append(" ".join(pair))
+
+    # Add a couple of generic software queries so we fetch a larger candidate pool,
+    # then ranking + embeddings can personalize results reliably.
+    queries.extend([
+        "software engineer",
+        "software developer",
+        "web developer",
+        "application developer",
+    ])
+
+    return list(dict.fromkeys(queries))[:20]
 
 
 def _fetch_url(url: str) -> dict:
@@ -17,33 +52,41 @@ def _fetch_url(url: str) -> dict:
         url,
         headers={'User-Agent': 'Mozilla/5.0 (compatible; Mindable/1.0)'}
     )
-    with urllib.request.urlopen(req, timeout=10) as response:
-        return json.loads(response.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read())
+    except urllib.error.URLError:
+        # Some environments inject an HTTPS proxy that blocks these APIs.
+        # Retry once without proxies to keep real-source fetching reliable.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(req, timeout=15) as response:
+            return json.loads(response.read())
 
 
 def _fetch_himalayas(skills: list[str], limit: int = 20) -> list[dict]:
-    query = " ".join(skills[:3])
-    url = f"{_HIMALAYAS_SEARCH_URL}?q={urllib.parse.quote(query)}&limit={limit}"
-    try:
-        data = _fetch_url(url)
-        jobs = []
-        for job in data.get('jobs', []):
-            jobs.append({
-                'title':       job.get('title', ''),
-                'company':     job.get('company', {}).get('name', ''),
-                'location':    job.get('locationRestrictions') or 'Remote',
-                'job_type':    job.get('employmentType', 'Full Time'),
-                'external_url': job.get('applicationUrl', ''),
-                'description': job.get('description', ''),
-                'required_skills': job.get('categories', []),
-                'is_remote':   True,
-                'source':      'himalayas',
-            })
-        logger.info("Fetched %d jobs from Himalayas.", len(jobs))
-        return jobs
-    except Exception as exc:
-        logger.error("Himalayas fetch failed: %s", exc)
-        return []
+    jobs: list[dict] = []
+    queries = _build_search_queries(skills) or ["remote developer"]
+    for query in queries:
+        url = f"{_HIMALAYAS_SEARCH_URL}?q={urllib.parse.quote(query)}&limit={limit}"
+        try:
+            data = _fetch_url(url)
+            for job in data.get('jobs', []):
+                jobs.append({
+                    'title':       job.get('title', ''),
+                    'company':     job.get('company', {}).get('name', ''),
+                    'location':    job.get('locationRestrictions') or 'Remote',
+                    'job_type':    job.get('employmentType', 'Full Time'),
+                    'external_url': job.get('applicationUrl', ''),
+                    'description': job.get('description', ''),
+                    'required_skills': job.get('categories', []),
+                    'is_remote':   True,
+                    'source':      'himalayas',
+                })
+        except Exception as exc:
+            logger.error("Himalayas fetch failed for query '%s': %s", query, exc)
+            continue
+    logger.info("Fetched %d jobs from Himalayas across %d queries.", len(jobs), len(queries))
+    return jobs
 
 
 def _fetch_arbeitnow(skills: list[str], page: int = 1) -> list[dict]:
@@ -88,6 +131,90 @@ def _fetch_arbeitnow(skills: list[str], page: int = 1) -> list[dict]:
         return []
 
 
+def _fetch_remoteok(skills: list[str], limit: int = 30) -> list[dict]:
+    try:
+        data = _fetch_url(_REMOTEOK_URL)
+        if not isinstance(data, list):
+            return []
+
+        skill_keywords = [s.lower() for s in skills]
+        jobs: list[dict] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            if not item.get("id"):
+                # First object in this API is metadata.
+                continue
+
+            title = (item.get("position") or item.get("role") or "").strip()
+            company = (item.get("company") or "").strip()
+            description = (item.get("description") or "").strip()
+            tags = item.get("tags") or []
+            combined = " ".join([title.lower(), description.lower(), " ".join(str(t).lower() for t in tags)])
+            if skill_keywords and not any(skill in combined for skill in skill_keywords):
+                continue
+
+            external_url = item.get("apply_url") or item.get("url") or ""
+            if not external_url:
+                continue
+
+            jobs.append({
+                "title": title,
+                "company": company,
+                "location": item.get("location") or "Remote",
+                "job_type": "remote",
+                "external_url": external_url,
+                "description": description,
+                "required_skills": tags if isinstance(tags, list) else [],
+                "is_remote": True,
+                "source": "remoteok",
+            })
+            if len(jobs) >= limit:
+                break
+        logger.info("Fetched %d matching jobs from RemoteOK.", len(jobs))
+        return jobs
+    except Exception as exc:
+        logger.error("RemoteOK fetch failed: %s", exc)
+        return []
+
+
+def _fetch_remotive(skills: list[str], limit: int = 40) -> list[dict]:
+    queries = _build_search_queries(skills) or ["developer"]
+    jobs: list[dict] = []
+    for query in queries:
+        url = f"{_REMOTIVE_URL}?search={urllib.parse.quote(query)}"
+        try:
+            data = _fetch_url(url)
+            for job in data.get("jobs", []):
+                title = job.get("title", "")
+                company = job.get("company_name", "")
+                description = job.get("description", "")
+                tags = job.get("tags") or []
+                url_apply = job.get("url", "")
+                if not url_apply:
+                    continue
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "location": job.get("candidate_required_location") or "Remote",
+                    "job_type": "remote",
+                    "external_url": url_apply,
+                    "description": description,
+                    "required_skills": tags if isinstance(tags, list) else [],
+                    "is_remote": True,
+                    "source": "remotive",
+                })
+                if len(jobs) >= limit:
+                    break
+            if len(jobs) >= limit:
+                break
+        except Exception as exc:
+            logger.error("Remotive fetch failed for query '%s': %s", query, exc)
+            continue
+    logger.info("Fetched %d jobs from Remotive.", len(jobs))
+    return jobs
+
+
 def _score_neurodivergent_friendly(job: dict) -> bool:
     friendly_signals = [
         'async', 'asynchronous', 'flexible hours', 'remote-first',
@@ -120,22 +247,28 @@ def fetch_jobs(
     all_jobs: list[dict] = []
 
     if include_remote:
-        all_jobs.extend(_fetch_himalayas(skills, limit=20))
+        all_jobs.extend(_fetch_himalayas(skills, limit=30))
+        all_jobs.extend(_fetch_remoteok(skills, limit=30))
+        all_jobs.extend(_fetch_remotive(skills, limit=40))
 
     if include_onsite:
-        all_jobs.extend(_fetch_arbeitnow(skills, page=1))
+        # Pull a few pages to avoid tiny feeds after dismissals.
+        for page in (1, 2, 3):
+            all_jobs.extend(_fetch_arbeitnow(skills, page=page))
 
-    scored = [job for job in all_jobs if _score_neurodivergent_friendly(job)]
     seen_urls: set[str] = set()
     unique_jobs: list[dict] = []
-    for job in scored:
+    # IMPORTANT: do not hard-filter by neurodivergence friendliness at fetch-time.
+    # We keep high recall here, and apply neurodivergence preferences during ranking
+    # so we don't accidentally drop good semantic matches.
+    for job in all_jobs:
         url = job.get('external_url', '')
         if url and url not in seen_urls:
             seen_urls.add(url)
             unique_jobs.append(job)
 
     logger.info(
-        "fetch_jobs complete. Total: %d, after ND filtering and dedup: %d.",
+        "fetch_jobs complete. Total: %d, after dedup: %d.",
         len(all_jobs), len(unique_jobs),
     )
     return unique_jobs
@@ -147,6 +280,7 @@ def fetch_and_save_jobs(
     include_onsite: bool = True,
 ) -> int:
     from jobs.models import Job, Company
+    from mindable.mindable_app.embedding_service import build_job_embeddings
 
     def _normalize_job_type(raw_type: str) -> str:
         value = (raw_type or "").strip().lower().replace("_", "-")
@@ -172,6 +306,20 @@ def fetch_and_save_jobs(
             company, _ = Company.objects.get_or_create(
                 name=job_data.get('company') or 'Unknown Company'
             )
+            job_skills_text = " ".join(
+                [job_data.get('title', ''), " ".join(job_data.get('required_skills', []) or [])]
+            ).strip()
+            job_needs_text = " ".join(
+                [job_data.get('location', ''), job_data.get('job_type', ''), job_data.get('description', '')]
+            ).strip()
+            skills_embedding = None
+            needs_embedding = None
+            if job_skills_text and job_needs_text:
+                try:
+                    skills_embedding, needs_embedding = build_job_embeddings(job_skills_text, job_needs_text)
+                except Exception as exc:
+                    logger.warning("Job embedding build failed for %s: %s", job_data.get('title', ''), exc)
+
             _, created = Job.objects.get_or_create(
                 external_url=job_data['external_url'],
                 defaults={
@@ -181,6 +329,8 @@ def fetch_and_save_jobs(
                     'job_type':             _normalize_job_type(job_data.get('job_type', '')),
                     'original_description': job_data.get('description', ''),
                     'required_skills':      job_data.get('required_skills', []),
+                    'skills_embedding':     skills_embedding,
+                    'needs_embedding':      needs_embedding,
                     # Fallback so jobs appear in the feed even before AI translation runs.
                     'translated_title':     job_data.get('title', ''),
                     'is_translated':        True,

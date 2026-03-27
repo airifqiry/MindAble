@@ -3,7 +3,7 @@ from __future__ import annotations
 PROFILE_ANALYSIS_MODEL: str = "claude-sonnet-4-6"
 DESCRIPTION_REWRITER_MODEL: str = "claude-sonnet-4-6"
 INTERVIEW_CHATBOT_MODEL: str = "claude-sonnet-4-6"
-JOB_MATCHER_MODEL = "claude-haiku-4-5-20251001"
+JOB_MATCHER_MODEL = "claude-sonnet-4-6"
 
 PROFILE_ANALYSIS_MAX_TOTAL_TOKENS: int = 2000
 REWRITER_MAX_TOTAL_TOKENS: int = 1500
@@ -60,6 +60,8 @@ PROFILE_ANALYSIS_SYSTEM: str = (
     "Return a single JSON object only. No markdown. No extra text.\n"
     "Use exactly these keys:\n"
     "- skills\n"
+    "- technical_skills\n"
+    "- general_skills\n"
     "- preferred_environment\n"
     "- communication_style\n"
     "- limitations\n"
@@ -67,7 +69,12 @@ PROFILE_ANALYSIS_SYSTEM: str = (
     "- work_values\n"
     "\n"
     "Schema rules:\n"
-    "- skills is a list of strings, or null if not supported by the profile.\n"
+    "- skills is a list of strings (all skills mentioned), or null if not supported by the profile.\n"
+    "- technical_skills is a list of strings: tools, languages, frameworks, platforms, engineering or "
+    "design technologies, data/ML/security/infrastructure competencies, or other domain-specific technical "
+    "capabilities. Use null if none are stated.\n"
+    "- general_skills is a list of strings: soft skills, communication, teamwork, leadership, organization, "
+    "or other non-tool competencies. Use null if not supported.\n"
     "- preferred_environment is a string, or null if not supported by the profile.\n"
     "- communication_style is a string, or null if not supported by the profile.\n"
     "- limitations is a list of strings, or null if not supported by the profile.\n"
@@ -79,6 +86,8 @@ PROFILE_ANALYSIS_SYSTEM: str = (
     "- If the profile does not clearly state something, use null for that field.\n"
     "- Keep a neutral, respectful tone.\n"
     "- Do not frame disabilities as deficits.\n"
+    "- Do not put the same item in both technical_skills and general_skills; prefer technical_skills when "
+    "it is clearly a tool, language, or domain-specific method.\n"
 )
 
 PROFILE_ANALYSIS_USER: str = (
@@ -104,6 +113,6 @@ JOB_MATCHER_SYSTEM: str = (
 PROFILE_ANALYSIS_RETRY_SUFFIX: str = (
     "Your previous output failed validation.\n"
     "Output again a single JSON object only.\n"
-    "No markdown. All required keys must be present.\n"
-    "Use null when information is not supported by the profile."
+    "No markdown. Include every key from the schema (use null when unknown).\n"
+    "technical_skills and general_skills must be present (use null or empty list as appropriate)."
 )

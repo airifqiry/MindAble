@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from .models import WorkplaceProfile
+from .models import WorkplaceProfile, ChatMessage
 from .forms import RegisterForm, LoginForm
 
 
@@ -63,6 +63,11 @@ def prep(request):
 
 
 @login_required
+def chat(request):
+    return render(request, 'mindable/prep.html')
+
+
+@login_required
 def onboarding(request):
     return render(request, 'mindable/onboarding.html')
 
@@ -106,20 +111,114 @@ def profile_upsert_api(request):
         analyzed = analyze_profile(profile_text)
         skills_emb, needs_emb = build_user_embeddings(analyzed)
         profile.skills_embedding = skills_emb
-        profile.needs_embedding  = needs_emb
+        profile.needs_embedding = needs_emb
+        # Persist structured analysis so ranking can use all profile signals.
+        profile.success_enablers = {
+            'text': enablers,
+            'analyzed_profile': analyzed,
+        }
+        profile.dealbreakers = analyzed.get('limitations') or []
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'detail': f'Embedding failed: {str(e)}'}, status=500)
+        return JsonResponse(
+            {'detail': f'AI analysis/embedding failed: {str(e)}'},
+            status=500
+        )
 
     profile.save(update_fields=[
         'skills',
         'experience_summary',
         'mental_disability',
         'success_enablers',
+        'dealbreakers',
         'skills_embedding',
         'needs_embedding',
         'last_updated',
     ])
 
     return JsonResponse({'detail': 'Saved.', 'redirect_url': '/jobs/'}, status=200)
+
+
+@login_required
+@require_POST
+def chat_api(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON."}, status=400)
+
+    user_message = str(payload.get("message") or "").strip()
+    topic = str(payload.get("topic") or "about-yourself").strip()
+    job_id = payload.get("job_id")
+    try:
+        job_id = int(job_id) if job_id is not None else None
+    except (TypeError, ValueError):
+        job_id = None
+
+    if not user_message:
+        return JsonResponse({"detail": "message is required."}, status=400)
+
+    try:
+        ChatMessage.objects.create(
+            user=request.user,
+            role="user",
+            content=user_message,
+        )
+        history_rows = ChatMessage.objects.filter(user=request.user).order_by("timestamp", "id")
+        history = [{"role": row.role, "content": row.content} for row in history_rows]
+
+        from mindable.mindable_app.interview_chatbot import run_interview_turn
+
+        out = run_interview_turn(
+            user=request.user,
+            topic=topic,
+            history=history,
+            job_id=job_id,
+        )
+
+        turn = out.get("turn", {}) if isinstance(out, dict) else {}
+        assistant_text = str(turn.get("assistant_message") or "").strip()
+        if turn.get("feedback_good"):
+            assistant_text += f"\nWhat went well: {turn['feedback_good']}"
+        if turn.get("feedback_improve"):
+            assistant_text += f"\nWhat to improve: {turn['feedback_improve']}"
+        if turn.get("feedback_how"):
+            assistant_text += f"\nHow to improve: {turn['feedback_how']}"
+        if turn.get("next_question"):
+            assistant_text += f"\nNext question: {turn['next_question']}"
+
+        assistant_text = assistant_text.strip()
+        if not assistant_text:
+            return JsonResponse({"detail": "Claude returned an empty response."}, status=502)
+
+        ChatMessage.objects.create(
+            user=request.user,
+            role="assistant",
+            content=assistant_text,
+        )
+        out["assistant_message"] = assistant_text
+    except Exception as exc:
+        return JsonResponse({"detail": f"Interview coach failed: {str(exc)}"}, status=500)
+
+    return JsonResponse(out, status=200)
+
+
+@login_required
+def chat_history(request):
+    rows = ChatMessage.objects.filter(user=request.user).order_by("timestamp", "id")
+    data = [
+        {
+            "id": row.id,
+            "role": row.role,
+            "content": row.content,
+            "timestamp": row.timestamp.isoformat(),
+        }
+        for row in rows
+    ]
+    return JsonResponse(data, safe=False, status=200)
+
+
+# Backward compatibility for existing frontend path.
+@login_required
+@require_POST
+def prep_chat_api(request):
+    return chat_api(request)

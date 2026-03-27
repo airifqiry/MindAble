@@ -2,15 +2,12 @@
 from __future__ import annotations
 
 import logging
-import os
-import time
-from functools import lru_cache
 from typing import Final
 
 from dotenv import load_dotenv
-import anthropic
 
 from mindable.mindable_app.prompts import JOB_MATCHER_MODEL, JOB_MATCHER_SYSTEM
+from mindable.mindable_app.claude_client import claude_messages_create, extract_text
 
 load_dotenv()
 
@@ -18,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 _MAX_SEARCH_USES: Final[int] = 3
-
-
-_MAX_RETRIES: Final[int] = 3
-_RETRY_BASE_DELAY: Final[float] = 1.0
 
 
 _WEB_SEARCH_TOOL: Final[dict] = {
@@ -51,61 +44,6 @@ For each job include:
 """.strip()
 
 
-@lru_cache(maxsize=1)
-def _get_client() -> anthropic.Anthropic:
-   
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError(
-            "Missing ANTHROPIC_API_KEY. Set it in your environment or a .env file."
-        )
-    return anthropic.Anthropic(api_key=key)
-
-
-def _extract_text(response: anthropic.types.Message) -> str:
-
-    return "".join(
-        block.text
-        for block in response.content
-        if getattr(block, "type", None) == "text"
-    ).strip()
-
-
-def _call_with_retry(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
-    last_exc: Exception | None = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            return client.messages.create(**kwargs)
-        except anthropic.RateLimitError as exc:
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "Rate limited; retrying in %.1fs (attempt %d/%d).",
-                delay, attempt + 1, _MAX_RETRIES,
-            )
-            time.sleep(delay)
-        except anthropic.APIStatusError as exc:
-            if exc.status_code and exc.status_code < 500:
-                raise
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "Server error %d; retrying in %.1fs (attempt %d/%d).",
-                exc.status_code, delay, attempt + 1, _MAX_RETRIES,
-            )
-            time.sleep(delay)
-        except anthropic.APIConnectionError as exc:
-            last_exc = exc
-            delay = _RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "Connection error; retrying in %.1fs (attempt %d/%d).",
-                delay, attempt + 1, _MAX_RETRIES,
-            )
-            time.sleep(delay)
-
-    raise RuntimeError("Job matching failed after all retries.") from last_exc
-
-
 def match_jobs(
     skills: list[str],
     location: str = "Remote",
@@ -122,10 +60,7 @@ def match_jobs(
         work_type=work_type,
     )
 
-    client = _get_client()
-
-    response = _call_with_retry(
-        client,
+    response = claude_messages_create(
         model=JOB_MATCHER_MODEL,
         max_tokens=1024,
         system=JOB_MATCHER_SYSTEM,
@@ -133,7 +68,7 @@ def match_jobs(
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    out = _extract_text(response)
+    out = extract_text(response)
     if not out:
         raise ValueError("Job matching produced an empty response.")
 
@@ -173,18 +108,14 @@ def match_jobs_with_ranker(
         f"{jobs_block}"
     )
 
-    client = _get_client()
-
-    
-    response = _call_with_retry(
-        client,
+    response = claude_messages_create(
         model=JOB_MATCHER_MODEL,
         max_tokens=1024,
         system=JOB_MATCHER_SYSTEM,
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    out = _extract_text(response)
+    out = extract_text(response)
     if not out:
         raise ValueError("Job analysis produced an empty response.")
 

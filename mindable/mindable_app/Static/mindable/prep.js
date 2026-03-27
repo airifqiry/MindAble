@@ -1,39 +1,3 @@
-const TOPICS = [
-  {
-    id: 'about-yourself',
-    label: 'Tell me about yourself'
-  },
-  {
-    id: 'strengths-challenges',
-    label: 'Strengths & challenges'
-  },
-  {
-    id: 'workplace-needs',
-    label: 'Workplace needs'
-  }
-];
-
-function getEnergy() {
-  const energy = window.localStorage.getItem('mindable_energy');
-  if (energy === 'low' || energy === 'medium' || energy === 'high') return energy;
-  return 'medium';
-}
-
-function setActiveTopicUI(topicId) {
-  const btns = document.querySelectorAll('.topic-btn[data-topic]');
-  btns.forEach(btn => {
-    const isActive = btn.dataset.topic === topicId;
-    btn.classList.toggle('is-active', isActive);
-    btn.setAttribute('aria-pressed', String(isActive));
-  });
-
-  const topicEl = document.getElementById('current-topic');
-  if (topicEl) {
-    const match = TOPICS.find(t => t.id === topicId);
-    if (match) topicEl.textContent = match.label;
-  }
-}
-
 function appendBubble({ role, text }) {
   const messages = document.getElementById('chat-messages');
   if (!messages) return;
@@ -53,7 +17,6 @@ function setTyping(isTyping) {
 }
 
 let prepJobId = null;
-let prepFeedbackByJobId = null;
 
 function getCsrfToken() {
   const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
@@ -75,79 +38,52 @@ async function ensurePrepJobId() {
   return prepJobId;
 }
 
-async function ensureFeedbackMap(jobId) {
-  if (prepFeedbackByJobId) return prepFeedbackByJobId;
-
-  const res = await fetch('/api/feedback/', {
-    credentials: 'same-origin',
-    headers: { 'Accept': 'application/json' }
-  });
-  if (!res.ok) {
-    prepFeedbackByJobId = {};
-    return prepFeedbackByJobId;
-  }
-
-  const data = await res.json();
-  const list = Array.isArray(data) ? data : (data.results || []);
-  prepFeedbackByJobId = {};
-  list.forEach(item => {
-    if (item?.job != null) prepFeedbackByJobId[String(item.job)] = item;
-  });
-  return prepFeedbackByJobId;
-}
-
-// Backend-wired response: saves the user's note via /api/feedback/.
-// NOTE: The current backend stores JobFeedback (job + status + note), not an AI-generated response.
-async function warmResponse(topicId, userText) {
+async function warmResponse(userText) {
   const jobId = await ensurePrepJobId();
   if (!jobId) return 'No job context found yet. Please check your job board first.';
 
   const csrfToken = getCsrfToken();
-  const payload = { job: jobId, status: 'saved', note: userText };
+  const payload = {
+    message: userText,
+    topic: 'general-interview',
+    job_id: jobId
+  };
 
-  const feedbackMap = await ensureFeedbackMap(jobId);
-  const existing = feedbackMap[String(jobId)];
-
-  let res;
-  if (existing) {
-    res = await fetch(`/api/feedback/${existing.id}/`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken
-      },
-      body: JSON.stringify(payload)
-    });
-  } else {
-    res = await fetch('/api/feedback/', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken
-      },
-      body: JSON.stringify(payload)
-    });
-  }
+  const res = await fetch('/chat/api/', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
+    },
+    body: JSON.stringify(payload)
+  });
 
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    return `Could not save your prep message. (${res.status}) ${txt}`;
+    return `Interview coach unavailable. (${res.status}) ${txt}`;
   }
 
   const data = await res.json();
-  // Show a simple confirmation using backend response.
-  if (data?.note) return `Saved. ${data.note}`;
-  return 'Saved.';
+  prepJobId = data?.job_id || prepJobId;
+  const assistant = String(data?.assistant_message || '').trim();
+  return assistant || 'Let us continue. Tell me your next answer.';
+}
+
+async function loadHistory() {
+  const res = await fetch('/chat/history/', {
+    credentials: 'same-origin',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
 }
 
 function initPrep() {
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
-  const changeLink = document.getElementById('change-topic-link');
   const logout = document.getElementById('logout-action');
 
   if (logout) {
@@ -157,22 +93,15 @@ function initPrep() {
     });
   }
 
-  let topicId = window.localStorage.getItem('mindable_prep_topic');
-  if (!TOPICS.some(t => t.id === topicId)) topicId = TOPICS[0].id;
-
-  setActiveTopicUI(topicId);
-
-  const btns = document.querySelectorAll('.topic-btn[data-topic]');
-  btns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const next = btn.dataset.topic;
-      topicId = next;
-      window.localStorage.setItem('mindable_prep_topic', next);
-      setActiveTopicUI(next);
-
-      const initial = `Great choice. We’ll practice: ${TOPICS.find(t => t.id === next).label}. When you’re ready, send a message.`;
-      appendBubble({ role: 'ai', text: initial });
-    });
+  loadHistory().then(rows => {
+    if (!rows.length) {
+      appendBubble({
+        role: 'assistant',
+        text: 'Hi. I am your interview coach. Share a first answer, and we will practice step by step.'
+      });
+      return;
+    }
+    rows.forEach(row => appendBubble({ role: row.role, text: row.content }));
   });
 
   let isThinking = false;
@@ -194,20 +123,12 @@ function initPrep() {
 
     const delay = 850 + Math.random() * 650;
     window.setTimeout(async () => {
-      const response = await warmResponse(topicId, text);
+      const response = await warmResponse(text);
       appendBubble({ role: 'ai', text: response });
       setTyping(false);
       isThinking = false;
     }, delay);
   });
-
-  if (changeLink) {
-    changeLink.addEventListener('click', event => {
-      event.preventDefault();
-      const sidebar = document.getElementById('topic-sidebar');
-      if (sidebar) sidebar.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
 }
 
 document.addEventListener('DOMContentLoaded', initPrep);

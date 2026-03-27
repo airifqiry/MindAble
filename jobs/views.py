@@ -2,8 +2,12 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Case, When, IntegerField, QuerySet
+from django.utils import timezone
+from datetime import timedelta
+import hashlib
 import logging
 import re
 
@@ -11,8 +15,127 @@ from .models import Job, UserJobInteraction
 from .serializers import JobListSerializer, JobDetailSerializer
 from users.models import WorkplaceProfile
 from mindable.mindable_app.job_fetcher import fetch_and_save_jobs
+from mindable.mindable_app.matching_logic import cosine_similarity
+from mindable.mindable_app.skill_classifier import split_technical_general
 
 logger = logging.getLogger(__name__)
+
+# Suitability: only "strong" and "moderate" tiers are shown; "weak" is filtered out.
+_STRONG_TIER_MIN = 0.55
+_MODERATE_TIER_MIN = 0.43
+# Minimum score to return in the API — no padding below this.
+_MIN_SCORE_TO_SHOW = _MODERATE_TIER_MIN
+
+
+def _natural_job_key(job: Job) -> str:
+    """Stable key for deduplication across duplicate DB rows (same listing, different ids)."""
+    company_name = ""
+    try:
+        company_name = (job.company.name or "").strip().lower()
+    except Exception:
+        pass
+    parts = [
+        (job.title or "").strip().lower(),
+        company_name,
+        (job.location or "").strip().lower(),
+        (job.external_url or "").strip().lower(),
+    ]
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _dedupe_jobs_keep_best_score(jobs: list[Job], score_map: dict[int, float]) -> tuple[list[Job], int]:
+    """
+    One row per natural key; keep the instance with the highest score.
+    Returns (deduped list sorted by score desc, number of rows dropped).
+    """
+    before = len(jobs)
+    best: dict[str, Job] = {}
+    best_score: dict[str, float] = {}
+    for job in jobs:
+        key = _natural_job_key(job)
+        sc = float(score_map.get(job.id, 0.0))
+        if key not in best or sc > best_score[key]:
+            best[key] = job
+            best_score[key] = sc
+    out = list(best.values())
+    out.sort(key=lambda j: best_score[_natural_job_key(j)], reverse=True)
+    return out, before - len(out)
+
+
+def _filter_by_min_score(
+    jobs: list[Job],
+    score_map: dict[int, float],
+    min_score: float,
+) -> list[Job]:
+    """Drop low-scoring jobs; jobs without a score_map entry are dropped (unscored = not shown)."""
+    kept: list[Job] = []
+    for job in jobs:
+        if job.id not in score_map:
+            continue
+        if float(score_map[job.id]) >= min_score:
+            kept.append(job)
+    return kept
+
+
+def _finalize_ranked_feed(
+    ranked: list | QuerySet,
+    score_map: dict[int, float],
+) -> tuple[list[Job], dict[int, float]]:
+    """
+    Deduplicate by natural key, then keep only jobs at or above minimum suitability.
+    No padding with low-quality matches — fewer results is correct.
+    """
+    ranked_list = list(ranked) if not isinstance(ranked, list) else ranked
+    before = len(ranked_list)
+    if not ranked_list:
+        logger.info("JOBS_FEED|before=0|after_dedupe=0|after_threshold=0")
+        return [], score_map
+
+    deduped, dupes_dropped = _dedupe_jobs_keep_best_score(ranked_list, score_map)
+    filtered = _filter_by_min_score(deduped, score_map, _MIN_SCORE_TO_SHOW)
+
+    if not filtered:
+        logger.warning(
+            "JOBS_FEED|no_jobs_meet_min_score|before=%s|after_dedupe=%s|min=%.2f|quality_over_quantity",
+            before,
+            len(deduped),
+            _MIN_SCORE_TO_SHOW,
+        )
+
+    logger.info(
+        "JOBS_FEED|before=%s|after_dedupe=%s|dupes_dropped=%s|after_threshold=%s|min_score=%.2f",
+        before,
+        len(deduped),
+        dupes_dropped,
+        len(filtered),
+        _MIN_SCORE_TO_SHOW,
+    )
+    for j in filtered[:5]:
+        logger.info(
+            "TOP5|title=%s|score=%.3f|tech=%s|general=%s|penalties=%s|tier=%s",
+            j.title,
+            float(score_map.get(j.id, 0.0)),
+            getattr(j, "_matched_technical_skills", []),
+            getattr(j, "_matched_general_skills", []),
+            getattr(j, "_penalties_applied", []),
+            getattr(j, "_match_tier", ""),
+        )
+    return filtered, score_map
+
+
+def _suitability_tier(score: float) -> str:
+    if score >= _STRONG_TIER_MIN:
+        return "strong"
+    if score >= _MODERATE_TIER_MIN:
+        return "moderate"
+    return "weak"
+
+
+class JobDiscoveryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 50
 
 
 def _extract_skills(user_skills_raw: str) -> list[str]:
@@ -52,11 +175,537 @@ def _extract_skills(user_skills_raw: str) -> list[str]:
     return keywords[:10]
 
 
+def _apply_embedding_ranking(
+    qs,
+    passport: WorkplaceProfile,
+    profile: dict | None = None,
+):
+    user_skills_embedding = passport.skills_embedding or []
+    user_needs_embedding = passport.needs_embedding or []
+    if not user_skills_embedding and not user_needs_embedding:
+        return qs.order_by("-created_at"), {}, {}
+
+    candidate_jobs = list(qs)
+    if not candidate_jobs:
+        return qs.order_by("-created_at"), {}, {}
+
+    if profile is None:
+        profile = _get_profile_structure(passport)
+    tech_mode = profile["tech_mode"]
+    mode_label = "technical-skill-driven" if tech_mode else "general-skill-driven"
+    logger.info(
+        "PROFILE|user=%s|mode=%s|technical_skills=%s|general_skills=%s|limitations=%s|disadvantages=%s",
+        passport.user_id,
+        mode_label,
+        profile["technical_skills"][:12],
+        profile["general_skills"][:12],
+        profile["limitations"][:10],
+        profile["behavioral_constraints"][:10],
+    )
+
+    scored: list[tuple[int, float]] = []
+    explanation_map: dict[int, str] = {}
+    hits_map: dict[int, dict[str, int]] = {}
+    details_map: dict[int, dict[str, list[str] | str]] = {}
+    excluded_ids: set[int] = set()
+
+    for job in candidate_jobs:
+        try:
+            raw_skills_score = 0.0
+            raw_needs_score = 0.0
+            if user_skills_embedding and getattr(job, "skills_embedding", None):
+                try:
+                    raw_skills_score = cosine_similarity(user_skills_embedding, job.skills_embedding)
+                except Exception:
+                    raw_skills_score = 0.0
+            if user_needs_embedding and getattr(job, "needs_embedding", None):
+                try:
+                    raw_needs_score = cosine_similarity(user_needs_embedding, job.needs_embedding)
+                except Exception:
+                    raw_needs_score = 0.0
+
+            e_skill = float((raw_skills_score + 1.0) / 2.0)
+            e_needs = float((raw_needs_score + 1.0) / 2.0)
+
+            text = _job_text(job)
+            text_tokens = set(_extract_skills(text))
+            title_text = (job.title or "").lower()
+            title_tokens = set(_extract_skills(title_text))
+
+            matched_prefs = [p for p in profile["work_preferences"] if _term_matches_text(p, text, text_tokens)][:4]
+            matched_interests = [i for i in profile["interests"] if _term_matches_text(i, text, text_tokens)][:4]
+            pref_hits = len(matched_prefs)
+            pref_fit = min(1.0, pref_hits / 4.0)
+            interest_fit = min(1.0, len(matched_interests) / 3.0)
+
+            avoid_hits = sum(
+                1
+                for term in profile["limitations"] + profile["unsuitable_environments"]
+                if _term_matches_text(term, text, text_tokens)
+            )
+
+            tech_pool = profile["technical_skills"]
+            gen_pool = profile["general_skills"]
+            strength_pool = profile["strengths"]
+
+            matched_technical = [t for t in tech_pool if _term_matches_text(t, text, text_tokens)][:8]
+            title_tech_hits = sum(1 for t in tech_pool if _term_matches_text(t, title_text, title_tokens))
+            matched_general = [t for t in gen_pool if _term_matches_text(t, text, text_tokens)][:8]
+            matched_strength = [t for t in strength_pool if _term_matches_text(t, text, text_tokens)][:6]
+
+            # Combined non-tech overlap for general mode / supporting signals
+            matched_skills = [s for s in profile["skills"] if _term_matches_text(s, text, text_tokens)][:8]
+            keyword_hits = len(matched_skills)
+            title_hits = sum(1 for term in profile["skills"] if _term_matches_text(term, title_text, title_tokens))
+
+            conflicts, penalties_applied, constraint_penalty, hard_block = _constraint_conflicts(profile, job)
+            if hard_block:
+                excluded_ids.add(job.id)
+                continue
+
+            limitation_penalty = min(0.55, 0.14 * avoid_hits)
+            behavioral_conflict_penalty = min(0.65, 0.18 * len(conflicts))
+            environment_penalty = 0.14 if any(k in text for k in ["open office", "high pressure", "on-site required"]) else 0.0
+            constraint_penalty_scaled = min(0.92, float(constraint_penalty) * 1.65)
+
+            if tech_mode:
+                # MODE A: technical alignment first, then general/support, then preferences — penalties last.
+                n_tech = max(len(tech_pool), 1)
+                tech_ratio = min(1.0, len(matched_technical) / n_tech)
+                title_tech_ratio = min(1.0, title_tech_hits / max(2, min(4, (len(tech_pool) + 1) // 2)))
+                n_gen = max(len(gen_pool), 1)
+                general_support = min(1.0, (len(matched_general) + len(matched_strength)) / max(n_gen, 3))
+
+                # Drop roles with no technical signal at all (unless embedding is clearly aligned).
+                if not matched_technical and title_tech_hits == 0 and e_skill < 0.44:
+                    continue
+
+                positive = (
+                    0.40 * e_skill
+                    + 0.26 * tech_ratio
+                    + 0.12 * title_tech_ratio
+                    + 0.10 * general_support
+                    + 0.07 * e_needs
+                    + 0.05 * pref_fit
+                )
+                if tech_ratio < 0.12 and title_tech_ratio < 0.12:
+                    positive *= 0.55
+            else:
+                # MODE B: general skills, strengths, embedding — no technical primacy.
+                n_all = max(len(gen_pool) + len(strength_pool), 1)
+                general_lex = min(1.0, (len(matched_general) + len(matched_strength)) / n_all)
+                n_skills_profile = max(len(profile["skills"]), 1)
+                lexical_skill_fit = min(1.0, keyword_hits / min(8, n_skills_profile))
+                title_fit = min(1.0, title_hits / 4.0)
+
+                signal_count = sum(
+                    [
+                        1 if keyword_hits else 0,
+                        1 if title_hits else 0,
+                        1 if pref_hits else 0,
+                        1 if matched_interests else 0,
+                        1 if e_skill >= 0.58 else 0,
+                    ]
+                )
+                weak_guard = 0.52 if signal_count < 2 else 1.0
+
+                positive = (
+                    0.32 * e_skill
+                    + 0.22 * e_needs
+                    + 0.20 * general_lex
+                    + 0.12 * lexical_skill_fit
+                    + 0.08 * title_fit
+                    + 0.06 * pref_fit
+                ) * weak_guard + 0.06 * interest_fit
+
+            raw = positive - limitation_penalty - behavioral_conflict_penalty - environment_penalty - constraint_penalty_scaled
+            final_score = max(0.0, min(1.0, raw))
+            tier = _suitability_tier(final_score)
+
+            scored.append((job.id, final_score))
+            hits_map[job.id] = {
+                "_match_keyword_hits": len(matched_technical) if tech_mode else keyword_hits,
+                "_match_title_hits": title_tech_hits if tech_mode else title_hits,
+                "_match_pref_hits": pref_hits,
+                "_match_avoid_hits": avoid_hits,
+            }
+
+            parts: list[str] = [f"Matching mode: {mode_label}."]
+            if tech_mode:
+                if matched_technical:
+                    parts.append(f"Technical overlap: {', '.join(matched_technical[:4])}.")
+                elif title_tech_hits:
+                    parts.append(f"Technical signals in title ({title_tech_hits}) plus embedding alignment.")
+                if matched_general or matched_strength:
+                    parts.append(
+                        "Supporting overlap: "
+                        + ", ".join((matched_general + matched_strength)[:4])
+                        + "."
+                    )
+            else:
+                overlap = matched_general + matched_strength or matched_skills
+                if overlap:
+                    parts.append(f"Profile overlap: {', '.join(overlap[:4])}.")
+            if matched_prefs:
+                parts.append(f"Preferences: {', '.join(matched_prefs[:2])}.")
+            if conflicts or limitation_penalty > 0.01 or behavioral_conflict_penalty > 0.01 or constraint_penalty_scaled > 0.01:
+                neg_bits = []
+                if conflicts:
+                    neg_bits.append(f"conflicts: {', '.join(conflicts[:3])}")
+                if limitation_penalty > 0.01:
+                    neg_bits.append("limitation/safety overlap")
+                if behavioral_conflict_penalty > 0.01:
+                    neg_bits.append("behavioral fit risk")
+                if constraint_penalty_scaled > 0.01:
+                    neg_bits.append("constraint penalty")
+                parts.append("Penalties: " + "; ".join(neg_bits) + ".")
+            parts.append(f"Suitability: {tier} (score {final_score:.2f}).")
+            final_reason = " ".join(parts)
+
+            explanation_map[job.id] = final_reason
+            details_map[job.id] = {
+                "matched_skills": matched_skills,
+                "matched_technical_skills": matched_technical,
+                "matched_general_skills": matched_general + matched_strength,
+                "matched_strengths": matched_strength,
+                "detected_conflicts": conflicts,
+                "penalties_applied": penalties_applied,
+                "final_reason": final_reason,
+                "match_tier": tier,
+                "matching_mode": mode_label,
+            }
+        except Exception:
+            continue
+
+    if not scored:
+        qs_ex = qs.exclude(id__in=excluded_ids) if excluded_ids else qs
+        return qs_ex.order_by("-created_at"), {}, {}
+
+    scored.sort(key=lambda item: item[1], reverse=True)
+    ranked_ids = [job_id for job_id, _ in scored]
+    score_map = {job_id: score for job_id, score in scored}
+
+    unranked_qs = qs.exclude(id__in=ranked_ids).exclude(id__in=excluded_ids).order_by("-created_at")
+    ordered_ranked_qs = qs.filter(id__in=ranked_ids).order_by(
+        Case(*[When(id=job_id, then=pos) for pos, job_id in enumerate(ranked_ids)], output_field=IntegerField())
+    )
+
+    ranked_instances = list(ordered_ranked_qs) + list(unranked_qs)
+    for j in ranked_instances:
+        if j.id in explanation_map:
+            setattr(j, "_match_explanation", explanation_map[j.id])
+        if j.id in hits_map:
+            for k, v in hits_map[j.id].items():
+                setattr(j, k, v)
+        details = details_map.get(j.id, {})
+        setattr(j, "_matched_skills", details.get("matched_skills", []))
+        setattr(j, "_matched_technical_skills", details.get("matched_technical_skills", []))
+        setattr(j, "_matched_general_skills", details.get("matched_general_skills", []))
+        setattr(j, "_matched_strengths", details.get("matched_strengths", []))
+        setattr(j, "_detected_conflicts", details.get("detected_conflicts", []))
+        setattr(j, "_penalties_applied", details.get("penalties_applied", []))
+        setattr(j, "_final_reason", details.get("final_reason", getattr(j, "_match_explanation", "")))
+        setattr(j, "_match_tier", details.get("match_tier", _suitability_tier(float(score_map.get(j.id, 0.0)))))
+        setattr(j, "_matching_mode", details.get("matching_mode", ""))
+
+    for j in ranked_instances[:50]:
+        logger.info(
+            "REC|job=%s|score=%.3f|tech=%s|general=%s|conflicts=%s|penalties=%s|tier=%s",
+            j.title,
+            score_map.get(j.id, 0.0),
+            getattr(j, "_matched_technical_skills", []),
+            getattr(j, "_matched_general_skills", []),
+            getattr(j, "_detected_conflicts", []),
+            getattr(j, "_penalties_applied", []),
+            getattr(j, "_match_tier", ""),
+        )
+    return ranked_instances, score_map, explanation_map
+
+
+def _ensure_user_embeddings(passport: WorkplaceProfile) -> WorkplaceProfile:
+    current_enablers = passport.success_enablers if isinstance(passport.success_enablers, dict) else {}
+    has_analyzed = isinstance(current_enablers.get("analyzed_profile"), dict)
+    has_embeddings = bool(passport.skills_embedding and passport.needs_embedding)
+    if has_embeddings and has_analyzed:
+        return passport
+
+    from mindable.mindable_app.profile_analyzer import analyze_profile
+    from mindable.mindable_app.embedding_service import build_user_embeddings
+
+    profile_text = " ".join(filter(None, [
+        passport.skills or "",
+        passport.experience_summary or "",
+        passport.mental_disability or "",
+        str(passport.success_enablers or {}),
+    ])).strip()
+    if not profile_text:
+        return passport
+
+    analyzed = analyze_profile(profile_text)
+    if not has_embeddings:
+        skills_emb, needs_emb = build_user_embeddings(analyzed)
+        passport.skills_embedding = skills_emb
+        passport.needs_embedding = needs_emb
+    current_enablers["analyzed_profile"] = analyzed
+    passport.success_enablers = current_enablers
+    passport.dealbreakers = analyzed.get("limitations") or passport.dealbreakers
+    passport.save(update_fields=[
+        "skills_embedding",
+        "needs_embedding",
+        "success_enablers",
+        "dealbreakers",
+        "last_updated",
+    ])
+    return passport
+
+
+def _get_profile_signals(passport: WorkplaceProfile) -> tuple[list[str], list[str], list[str]]:
+    enablers = passport.success_enablers if isinstance(passport.success_enablers, dict) else {}
+    analyzed = enablers.get("analyzed_profile") if isinstance(enablers.get("analyzed_profile"), dict) else {}
+
+    raw_skills = _extract_skills(passport.skills or "")
+    analyzed_skills = analyzed.get("skills") or []
+    skill_terms = [str(s).strip().lower() for s in (raw_skills + analyzed_skills) if str(s).strip()]
+
+    preference_terms: list[str] = []
+    for key in ("preferred_environment", "communication_style"):
+        value = analyzed.get(key)
+        if value:
+            preference_terms.extend(_extract_skills(str(value)))
+    for key in ("accommodations_needed", "work_values"):
+        values = analyzed.get(key) or []
+        preference_terms.extend(_extract_skills(" ".join(str(v) for v in values if v)))
+
+    avoid_terms: list[str] = []
+    limitations = analyzed.get("limitations") or []
+    avoid_terms.extend(_extract_skills(" ".join(str(v) for v in limitations if v)))
+    avoid_terms.extend(_extract_skills(" ".join(str(v) for v in (passport.dealbreakers or []) if v)))
+
+    # Deduplicate but keep stable order.
+    def _dedupe(items: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for item in items:
+            t = item.strip().lower()
+            if not t or t in seen:
+                continue
+            seen.add(t)
+            out.append(t)
+        return out
+
+    return _dedupe(skill_terms)[:25], _dedupe(preference_terms)[:25], _dedupe(avoid_terms)[:20]
+
+
+def _get_profile_structure(passport: WorkplaceProfile) -> dict:
+    enablers = passport.success_enablers if isinstance(passport.success_enablers, dict) else {}
+    analyzed = enablers.get("analyzed_profile") if isinstance(enablers.get("analyzed_profile"), dict) else {}
+    skills, preferences, avoid_terms = _get_profile_signals(passport)
+
+    analyzed_tech = [
+        str(x).strip().lower()
+        for x in (analyzed.get("technical_skills") or [])
+        if str(x).strip()
+    ]
+    analyzed_gen = [
+        str(x).strip().lower()
+        for x in (analyzed.get("general_skills") or [])
+        if str(x).strip()
+    ]
+    tech_h, gen_h = split_technical_general(skills)
+    technical_skills = list(dict.fromkeys(analyzed_tech + tech_h))[:40]
+    general_skills = list(dict.fromkeys(analyzed_gen + gen_h))[:40]
+    tech_mode = len(technical_skills) > 0
+
+    exp_terms = [s for s in _extract_skills(str(passport.experience_summary or "")) if len(s) > 2][:20]
+    strengths = list(dict.fromkeys([s for s in general_skills if len(s) > 2] + exp_terms))[:30]
+    interests = [s for s in _extract_skills(str(passport.experience_summary or "")) if len(s) > 2][:20]
+    limitations = [s for s in _extract_skills(" ".join(str(v) for v in (analyzed.get("limitations") or []))) if len(s) > 2]
+    behavioral_constraints = limitations + [s for s in _extract_skills(passport.mental_disability or "") if len(s) > 2]
+    unsuitable = [s for s in avoid_terms if len(s) > 2]
+    hard_disqualifiers = [s for s in _extract_skills(" ".join(str(v) for v in (passport.dealbreakers or []))) if len(s) > 2]
+
+    return {
+        "skills": list(dict.fromkeys(skills)),
+        "technical_skills": technical_skills,
+        "general_skills": general_skills,
+        "tech_mode": tech_mode,
+        "strengths": strengths,
+        "interests": list(dict.fromkeys(interests)),
+        "work_preferences": list(dict.fromkeys(preferences)),
+        "limitations": list(dict.fromkeys(limitations)),
+        "behavioral_constraints": list(dict.fromkeys(behavioral_constraints)),
+        "unsuitable_environments": list(dict.fromkeys(unsuitable)),
+        "hard_disqualifiers": list(dict.fromkeys(hard_disqualifiers)),
+    }
+
+
+def _job_text(job: Job) -> str:
+    return " ".join(
+        [
+            job.title or "",
+            job.original_description or "",
+            " ".join(job.required_skills or []),
+            job.location or "",
+            job.job_type or "",
+        ]
+    ).lower()
+
+
+def _term_matches_text(term: str, text: str, text_tokens: set[str]) -> bool:
+    t = (term or "").strip().lower()
+    if not t:
+        return False
+    if t in text:
+        return True
+    parts = [p for p in _extract_skills(t) if p]
+    if not parts:
+        return False
+    return all(p in text_tokens for p in parts)
+
+
+def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str], float, bool]:
+    text = _job_text(job)
+    text_tokens = set(_extract_skills(text))
+    conflicts: list[str] = []
+    penalties: list[str] = []
+    penalty_score = 0.0
+    hard_block = False
+
+    for term in profile["hard_disqualifiers"]:
+        if _term_matches_text(term, text, text_tokens):
+            hard_block = True
+            conflicts.append(f"hard disqualifier: {term}")
+            penalties.append(f"hard_disqualifier:{term} (-0.95)")
+            penalty_score += 0.95
+
+    contradiction_rules = [
+        (["patience", "impatient"], ["teaching", "mentoring", "support", "customer", "stakeholder"], "requires sustained patience"),
+        (["communication", "social", "anxiety"], ["client-facing", "sales", "customer", "public speaking", "presentation"], "high communication demand"),
+        (["emotional", "regulation", "stress"], ["high pressure", "escalation", "conflict", "incident response"], "high emotional regulation demand"),
+        (["sensory", "noise", "noisy"], ["open office", "busy environment", "retail", "warehouse"], "noisy/chaotic environment"),
+        (["deadline", "time management"], ["fast-paced", "tight deadline", "urgent", "on call"], "high deadline pressure"),
+        (["leadership", "manage"], ["lead", "manager", "supervise", "people management"], "leadership requirement"),
+    ]
+    user_constraints = set(profile["limitations"] + profile["behavioral_constraints"] + profile["unsuitable_environments"])
+    for triggers, job_terms, label in contradiction_rules:
+        trigger_hit = any(t in user_constraints for t in triggers)
+        job_hit = any(jt in text for jt in job_terms)
+        if trigger_hit and job_hit:
+            conflicts.append(label)
+            penalties.append(f"constraint_conflict:{label} (-0.38)")
+            penalty_score += 0.38
+
+    for lim in profile["limitations"][:20]:
+        if _term_matches_text(lim, text, text_tokens):
+            conflicts.append(f"limitation overlap: {lim}")
+            penalties.append(f"limitation_overlap:{lim} (-0.16)")
+            penalty_score += 0.16
+
+    return conflicts[:8], penalties[:8], min(1.0, penalty_score), hard_block
+
+
+def _ensure_job_embeddings(qs) -> None:
+    from mindable.mindable_app.embedding_service import build_job_embeddings
+
+    # Backfill more jobs so personalization has enough candidates.
+    missing = list(qs.filter(Q(skills_embedding__isnull=True) | Q(needs_embedding__isnull=True))[:150])
+    for job in missing:
+        skills_text = " ".join(
+            [job.title or "", " ".join(job.required_skills or [])]
+        ).strip()
+        needs_text = " ".join(
+            [job.location or "", job.job_type or "", job.original_description or ""]
+        ).strip()
+        if not skills_text or not needs_text:
+            continue
+        try:
+            skills_emb, needs_emb = build_job_embeddings(skills_text, needs_text)
+            job.skills_embedding = skills_emb
+            job.needs_embedding = needs_emb
+            job.save(update_fields=["skills_embedding", "needs_embedding"])
+        except Exception as exc:
+            logger.warning("Failed to backfill embeddings for job %s: %s", job.id, exc)
+
+
+def _extract_bullets(block: str) -> list[str]:
+    lines = []
+    for line in (block or "").splitlines():
+        t = line.strip()
+        if t.startswith(("-", "*", "•")):
+            item = t[1:].strip()
+            if item:
+                lines.append(item)
+    return lines
+
+
+def _build_toxicity_warnings(text: str) -> list[str]:
+    lower = (text or "").lower()
+    flags = []
+    if "fast-paced" in lower or "fast paced" in lower:
+        flags.append("Fast-paced environment mentioned.")
+    if "high pressure" in lower or "high-pressure" in lower:
+        flags.append("High-pressure language found.")
+    if "must multitask" in lower or "multi-task" in lower:
+        flags.append("Heavy multitasking requirement mentioned.")
+    if "on-site" in lower or "onsite required" in lower:
+        flags.append("On-site requirement mentioned.")
+    return flags[:3]
+
+
+def _rewrite_and_enrich_job(job: Job) -> str:
+    from mindable.mindable_app.description_rewriter import rewrite_job_description
+    rewritten = rewrite_job_description(job.original_description or "")
+    lower = rewritten.lower()
+
+    imp_start = lower.find("important things")
+    day_start = lower.find("a typical day")
+
+    important_block = ""
+    typical_day_block = ""
+    if imp_start >= 0 and day_start > imp_start:
+        important_block = rewritten[imp_start:day_start]
+        typical_day_block = rewritten[day_start:]
+    elif day_start >= 0:
+        typical_day_block = rewritten[day_start:]
+    else:
+        important_block = rewritten
+
+    important = _extract_bullets(important_block)
+    typical_day = _extract_bullets(typical_day_block)
+    merged_tasks = (important + typical_day)[:8]
+    if not merged_tasks:
+        merged_tasks = _extract_bullets(rewritten)[:8]
+
+    update_fields: list[str] = []
+    if merged_tasks:
+        job.translated_tasks = merged_tasks
+        update_fields.append("translated_tasks")
+    if not job.translated_title:
+        job.translated_title = job.title
+        update_fields.append("translated_title")
+    if not job.toxicity_warnings:
+        job.toxicity_warnings = _build_toxicity_warnings(job.original_description or "")
+        update_fields.append("toxicity_warnings")
+    if not job.is_translated:
+        job.is_translated = True
+        update_fields.append("is_translated")
+
+    if update_fields:
+        job.save(update_fields=update_fields)
+
+    return rewritten
+
+
 class JobDiscoveryHubView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = JobListSerializer
+    pagination_class = JobDiscoveryPagination
+    _MIN_FEED_SIZE = 10
+    _REFRESH_IF_MATCHES_LT = 25
+    _STALE_AFTER_HOURS = 2
 
     def get_queryset(self):
+        print("JOBS API HIT")
         user = self.request.user
 
         print("DEBUG: get_queryset called for user:", user)
@@ -64,6 +713,10 @@ class JobDiscoveryHubView(generics.ListAPIView):
         try:
             passport = WorkplaceProfile.objects.get(user=user)
             user_skills_raw = passport.skills
+            try:
+                passport = _ensure_user_embeddings(passport)
+            except Exception as exc:
+                logger.error("Failed to ensure user embeddings for %s: %s", user, exc)
         except WorkplaceProfile.DoesNotExist:
             print("DEBUG: No WorkplaceProfile found for user", user)
             return Job.objects.none()
@@ -75,25 +728,35 @@ class JobDiscoveryHubView(generics.ListAPIView):
             return Job.objects.none()
 
         skills = _extract_skills(user_skills_raw)
+        skill_terms, preference_terms, _avoid_terms = _get_profile_signals(passport)
+        fetch_terms = list(dict.fromkeys(skills + skill_terms + preference_terms))[:24]
         print("DEBUG skills list:", skills)
         print("DEBUG total jobs in DB:", Job.objects.count())
         print("DEBUG translated jobs:", Job.objects.filter(is_translated=True).count())
 
         
-        skill_filter = Q()
-        for skill in skills:
-            skill_filter |= Q(title__icontains=skill)
-            skill_filter |= Q(original_description__icontains=skill)
+        # Decide whether we should refresh the job pool using the broader
+        # profile-derived fetch terms (not only raw extracted keywords).
+        user_has_matching_jobs = Job.objects.none()
+        try:
+            skill_filter = Q()
+            for term in list(dict.fromkeys(fetch_terms))[:18]:
+                skill_filter |= Q(title__icontains=term)
+                skill_filter |= Q(original_description__icontains=term)
+            user_has_matching_jobs = Job.objects.filter(skill_filter, is_translated=True).exists()
+        except Exception:
+            user_has_matching_jobs = Job.objects.filter(is_translated=True).exists()
 
-        user_has_matching_jobs = Job.objects.filter(
-            skill_filter,
-            is_translated=True
-        ).exists()
+        newest = Job.objects.order_by("-created_at").first()
+        is_stale_pool = (
+            newest is None or newest.created_at < timezone.now() - timedelta(hours=self._STALE_AFTER_HOURS)
+        )
+        should_refresh = (not user_has_matching_jobs) or is_stale_pool
 
-        if not user_has_matching_jobs:
+        if should_refresh:
             try:
                 fetch_and_save_jobs(
-                    skills=skills,
+                    skills=fetch_terms or skills,
                     include_remote=True,
                     include_onsite=True,
                 )
@@ -118,15 +781,119 @@ class JobDiscoveryHubView(generics.ListAPIView):
             qs = qs.filter(job_type=job_type)
 
         
-        if skills:
-            skill_filter = Q()
-            for skill in skills:
-                skill_filter |= Q(title__icontains=skill)
-                skill_filter |= Q(original_description__icontains=skill)
-            qs = qs.filter(skill_filter)
+        # Refill when user has dismissed many roles and feed gets too small.
+        if qs.count() < self._MIN_FEED_SIZE:
+            try:
+                fetch_and_save_jobs(
+                    skills=fetch_terms or skills,
+                    include_remote=True,
+                    include_onsite=True,
+                )
+                qs = Job.objects.filter(is_translated=True).exclude(id__in=dismissed_job_ids)
+            except Exception as e:
+                logger.error("feed refill fetch failed: %s", e)
+
+        # If pool is still thin, perform one wider refresh using full analyzed terms.
+        if qs.count() < self._REFRESH_IF_MATCHES_LT and fetch_terms:
+            try:
+                fetch_and_save_jobs(
+                    skills=fetch_terms,
+                    include_remote=True,
+                    include_onsite=True,
+                )
+                qs = Job.objects.filter(is_translated=True).exclude(id__in=dismissed_job_ids)
+            except Exception as e:
+                logger.error("wide refresh fetch failed: %s", e)
+
+        if qs.count() < self._MIN_FEED_SIZE:
+            # Keep fallback personalized: pick from all jobs, then rank by embeddings per user.
+            qs = Job.objects.filter(is_translated=True).exclude(id__in=dismissed_job_ids)
 
         print("DEBUG: final qs count:", qs.count())
-        return qs.order_by('-created_at')
+        _ensure_job_embeddings(qs)
+        profile_struct = _get_profile_structure(passport)
+        self._matching_mode = (
+            "technical-skill-driven" if profile_struct["tech_mode"] else "general-skill-driven"
+        )
+        logger.info("JOB_PIPELINE|matching_mode=%s", self._matching_mode)
+        ranked_qs, score_map, _explanations = _apply_embedding_ranking(qs, passport, profile_struct)
+
+        # If the ranking has too few "role-aligned" jobs, refresh once more with
+        # broader fetch terms and re-rank. This prevents the UI from showing only
+        # 1-2 strong matches while many weaker matches exist in the pool.
+        top_n = getattr(self.pagination_class, "page_size", 10)
+        role_aligned = sum(
+            1
+            for j in ranked_qs[:top_n]
+            if getattr(j, "_match_keyword_hits", 0) > 0 or getattr(j, "_match_pref_hits", 0) > 0
+        )
+        if role_aligned < max(3, top_n // 2) and fetch_terms:
+            try:
+                fetch_and_save_jobs(
+                    skills=fetch_terms,
+                    include_remote=True,
+                    include_onsite=True,
+                )
+                qs = Job.objects.filter(is_translated=True).exclude(id__in=dismissed_job_ids)
+                _ensure_job_embeddings(qs)
+                ranked_qs, score_map, _explanations = _apply_embedding_ranking(
+                    qs, passport, profile_struct
+                )
+            except Exception as e:
+                logger.error("refresh after low role alignment failed: %s", e)
+
+        ranked_qs, score_map = _finalize_ranked_feed(ranked_qs, score_map)
+        self._score_map = score_map
+        return ranked_qs
+
+    def list(self, request, *args, **kwargs):
+        print("JOBS API HIT (list)")
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        score_map = getattr(self, "_score_map", {})
+
+        if page is not None:
+            mode = getattr(self, "_matching_mode", "")
+            for job in page:
+                setattr(job, "_dedupe_key", _natural_job_key(job))
+                setattr(job, "_matching_mode", mode)
+                if job.id in score_map:
+                    sc = float(score_map[job.id])
+                    setattr(job, "_match_score", sc)
+                    if not getattr(job, "_match_tier", None):
+                        setattr(job, "_match_tier", _suitability_tier(sc))
+            serializer = self.get_serializer(page, many=True)
+            payload = {
+                "jobs": serializer.data,
+                "matching_mode": getattr(self, "_matching_mode", "unknown"),
+                "min_suitability_score": _MIN_SCORE_TO_SHOW,
+                "count": self.paginator.page.paginator.count,
+                "next": self.paginator.get_next_link(),
+                "previous": self.paginator.get_previous_link(),
+            }
+            logger.info("Job API returning %d jobs (paginated).", len(serializer.data))
+            print("DEBUG: API jobs returned:", len(serializer.data))
+            return Response(payload)
+
+        mode = getattr(self, "_matching_mode", "")
+        for job in queryset:
+            setattr(job, "_dedupe_key", _natural_job_key(job))
+            setattr(job, "_matching_mode", mode)
+            if job.id in score_map:
+                sc = float(score_map[job.id])
+                setattr(job, "_match_score", sc)
+                if not getattr(job, "_match_tier", None):
+                    setattr(job, "_match_tier", _suitability_tier(sc))
+        serializer = self.get_serializer(queryset, many=True)
+        logger.info("Job API returning %d jobs (non-paginated).", len(serializer.data))
+        print("DEBUG: API jobs returned:", len(serializer.data))
+        return Response(
+            {
+                "jobs": serializer.data,
+                "matching_mode": getattr(self, "_matching_mode", "unknown"),
+                "min_suitability_score": _MIN_SCORE_TO_SHOW,
+            }
+        )
 
 
 class JobDetailView(generics.RetrieveAPIView):
@@ -136,11 +903,23 @@ class JobDetailView(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         job = self.get_object()
-        if not job.is_translated:
-            return Response(
-                {"detail": "This job is still being processed. Please check back shortly."},
-                status=status.HTTP_202_ACCEPTED
-            )
+        if not job.translated_tasks or not job.is_translated:
+            try:
+                accessible = _rewrite_and_enrich_job(job)
+                setattr(job, "_accessible_summary", accessible)
+            except Exception as exc:
+                logger.error("description rewrite failed for job %s: %s", job.id, exc)
+                return Response(
+                    {
+                        "detail": (
+                            "AI rewrite is required but unavailable right now. "
+                            "Check Anthropic dependency and API key configuration."
+                        )
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+        else:
+            setattr(job, "_accessible_summary", "\n".join(f"- {t}" for t in job.translated_tasks))
         return super().retrieve(request, *args, **kwargs)
 
 

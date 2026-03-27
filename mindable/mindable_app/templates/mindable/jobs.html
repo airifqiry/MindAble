@@ -1,44 +1,17 @@
+{% extends "mindable/base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MindAble – Job Listings</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="{% static 'jobs.css' %}"/>
-</head>
-<body>
+{% block title %}MindAble – Job Listings{% endblock %}
+{% block active_page %}jobs{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'jobs.css' %}?v=7"/>
+{% endblock %}
+{% block content %}
 
 <!-- ── Aura background ── -->
 <div class="bg-auras">
   <div class="aura aura-1"></div>
   <div class="aura aura-2"></div>
   <div class="aura aura-3"></div>
-</div>
-
-<!-- ── NAV ── -->
-<nav id="navbar">
-  <a href="{% url 'home' %}" class="nav-brand">
-    <div class="nav-logo">
-      <svg viewBox="0 0 24 24"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
-    </div>
-    MindAble
-  </a>
-  <button class="nav-menu-btn" id="nav-menu-btn" aria-label="Open menu" aria-expanded="false">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
-
-<!-- ── NAV DROPDOWN PANEL ── -->
-<div id="nav-menu-panel" hidden>
-  <a href="{% url 'home' %}" data-page="home" class="nav-menu-link">Home</a>
-  <a href="{% url 'jobs' %}" data-page="jobs" class="nav-menu-link active">Job Listings</a>
-  <a href="{% url 'prep' %}" data-page="prep" class="nav-menu-link">Interview Prep</a>
-  <a href="{% url 'home' %}#profile" data-page="profile" class="nav-menu-link">Profile</a>
-  <a href="{% url 'logout' %}" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
 </div>
 
 <!-- ── PAGE ── -->
@@ -57,10 +30,10 @@
   </div><!-- /job-feed -->
 
   <!-- Empty state -->
-  <div class="empty-state" id="empty-state">
+  <div class="empty-state" id="empty-state" hidden>
     <div class="empty-icon">🌿</div>
-    <p class="empty-h">No roles yet</p>
-    <p class="empty-p">Once the backend is connected, your matched roles will appear here.</p>
+    <p class="empty-h">No roles available right now</p>
+    <p class="empty-p">Try again later or update your profile skills for broader matching.</p>
   </div>
 
   <!-- Load more -->
@@ -69,8 +42,8 @@
   </div>
 
 </main>
-
-<script src="{% static 'jobs.js' %}"></script>
-</body>
-</html>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'jobs.js' %}?v=7"></script>
+{% endblock %}
 

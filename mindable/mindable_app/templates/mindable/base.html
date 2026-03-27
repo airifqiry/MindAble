@@ -1,0 +1,51 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}MindAble{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'common.css' %}"/>
+  {% block extra_css %}{% endblock %}
+</head>
+<body data-active-page="{% block active_page %}{% endblock %}">
+  <div id="nav-wrapper">
+    <nav>
+      <a class="nav-brand" href="{% url 'home' %}">
+        <div class="nav-logo">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </div>
+        MindAble
+      </a>
+      <div class="nav-links">
+        <a
+          href="#"
+          class="nav-menu-trigger"
+          id="nav-menu-trigger"
+          aria-haspopup="menu"
+          aria-controls="nav-menu-panel"
+          aria-expanded="false"
+        >
+          Menu
+        </a>
+      </div>
+    </nav>
+
+    <div id="nav-menu-panel" hidden>
+      <a href="{% url 'home' %}" data-page="home" class="nav-menu-link">Home</a>
+      <a href="{% url 'jobs' %}" data-page="jobs" class="nav-menu-link">Job Listings</a>
+      <a href="{% url 'home' %}#profile" data-page="profile" class="nav-menu-link">Profile</a>
+      <a href="{% url 'chat' %}" data-page="chatbot" class="nav-menu-link">Chatbot</a>
+      <a href="{% url 'logout' %}" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+    </div>
+  </div>
+
+  {% block content %}{% endblock %}
+
+  <script src="{% static 'common.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

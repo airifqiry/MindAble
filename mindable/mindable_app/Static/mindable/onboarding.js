@@ -94,15 +94,16 @@ function submitProfile(){
     body: JSON.stringify(payload)
   }).then(async (res) => {
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`Save failed (${res.status}). ${txt}`);
+      const data = await res.json().catch(() => ({}));
+      const detail = data && data.detail ? data.detail : 'Unknown error';
+      throw new Error(`Save failed (${res.status}): ${detail}`);
     }
     // User instruction: redirect to /jobs/ after POST.
     window.location.href = '/jobs/';
   }).catch((err) => {
     console.error(err);
     if (overlayTitle) overlayTitle.textContent = 'Could not save your profile';
-    if (overlayMsg) overlayMsg.textContent = 'Please try again in a moment.';
+    if (overlayMsg) overlayMsg.textContent = err.message || 'Please try again in a moment.';
   });
 }
 

@@ -1,71 +1,23 @@
+{% extends "mindable/base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAble – Interview Prep</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-
+{% block title %}MindAble – Interview Prep{% endblock %}
+{% block active_page %}chatbot{% endblock %}
+{% block extra_css %}
   <link rel="stylesheet" href="{% static 'signup.css' %}"/>
-  <link rel="stylesheet" href="{% static 'common.css' %}"/>
   <link rel="stylesheet" href="{% static 'prep.css' %}"/>
-</head>
-<body data-active-page="prep">
+{% endblock %}
+{% block content %}
   <div class="bg">
     <div class="aura aura-1"></div>
     <div class="aura aura-2"></div>
     <div class="aura aura-3"></div>
   </div>
 
-  <div id="nav-wrapper">
-    <nav>
-      <a class="nav-brand" href="{% url 'home' %}">
-        <div class="nav-logo">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </div>
-        MindAble
-      </a>
-      <div class="nav-links">
-        <a
-          href="#"
-          class="nav-menu-trigger"
-          id="nav-menu-trigger"
-          aria-haspopup="menu"
-          aria-controls="nav-menu-panel"
-          aria-expanded="false"
-        >
-          Menu
-        </a>
-      </div>
-    </nav>
-
-    <div id="nav-menu-panel" hidden>
-      <a href="{% url 'home' %}" data-page="home" class="nav-menu-link">Home</a>
-      <a href="{% url 'jobs' %}" data-page="jobs" class="nav-menu-link">Job Listings</a>
-      <a href="{% url 'prep' %}" data-page="prep" class="nav-menu-link">Interview Prep</a>
-      <a href="{% url 'home' %}#profile" data-page="profile" class="nav-menu-link">Profile</a>
-      <a href="{% url 'logout' %}" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
-    </div>
-  </div>
-
   <main class="prep-page">
     <div class="prep-layout">
-      <aside class="prep-sidebar prep-panel reveal" aria-label="Practice topics" id="topic-sidebar">
-        <div class="prep-sidebar-title">Practice topics</div>
-        <div class="topic-list" id="topic-list">
-          <button type="button" class="topic-btn" data-topic="about-yourself">Tell me about yourself</button>
-          <button type="button" class="topic-btn" data-topic="strengths-challenges">Strengths &amp; challenges</button>
-          <button type="button" class="topic-btn" data-topic="workplace-needs">Workplace needs</button>
-        </div>
-      </aside>
-
       <section class="prep-chat prep-panel reveal">
         <div class="chat-header">
-          <p class="chat-topic" id="current-topic">Tell me about yourself</p>
-          <a href="#" class="chat-change" id="change-topic-link">Change topic</a>
+          <p class="chat-topic" id="current-topic">Interview Coach</p>
         </div>
 
         <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
@@ -87,9 +39,8 @@
       </section>
     </div>
   </main>
-
-  <script src="{% static 'common.js' %}"></script>
+{% endblock %}
+{% block extra_js %}
   <script src="{% static 'prep.js' %}"></script>
-</body>
-</html>
+{% endblock %}
 
