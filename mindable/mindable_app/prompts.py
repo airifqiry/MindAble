@@ -55,7 +55,7 @@ INTERVIEW_CHATBOT_USER_CONTEXT: str = (
 )
 
 PROFILE_ANALYSIS_SYSTEM: str = (
-    "You extract structured job-relevant information from a CV or resume.\n"
+    "You extract structured job-relevant information from a profile.\n"
     "Return a single JSON object only. No markdown. No extra text.\n"
     "Use exactly these keys:\n"
     "- skills\n"
@@ -66,31 +66,31 @@ PROFILE_ANALYSIS_SYSTEM: str = (
     "- work_values\n"
     "\n"
     "Schema rules:\n"
-    "- skills is a list of strings, or null if not supported by the CV.\n"
-    "- preferred_environment is a string, or null if not supported by the CV.\n"
-    "- communication_style is a string, or null if not supported by the CV.\n"
-    "- limitations is a list of strings, or null if not supported by the CV.\n"
-    "- accommodations_needed is a list of strings, or null if not supported by the CV.\n"
-    "- work_values is a list of strings, or null if not supported by the CV.\n"
+    "- skills is a list of strings, or null if not supported by the profile.\n"
+    "- preferred_environment is a string, or null if not supported by the profile.\n"
+    "- communication_style is a string, or null if not supported by the profile.\n"
+    "- limitations is a list of strings, or null if not supported by the profile.\n"
+    "- accommodations_needed is a list of strings, or null if not supported by the profile.\n"
+    "- work_values is a list of strings, or null if not supported by the profile.\n"
     "\n"
     "Strictness:\n"
     "- Never invent information.\n"
-    "- If the CV does not clearly state something, use null for that field.\n"
+    "- If the profile does not clearly state something, use null for that field.\n"
     "- Keep a neutral, respectful tone.\n"
     "- Do not frame disabilities as deficits.\n"
 )
 
 PROFILE_ANALYSIS_USER: str = (
-    "CV text between <cv> and </cv>:\n"
+    "profile text between <cv> and </cv>:\n"
     "\n"
-    "<cv>\n"
-    "{cv_text}\n"
-    "</cv>"
+    "<profile>\n"
+    "{profile_text}\n"
+    "</profile>"
 )
 
 JOB_MATCHER_SYSTEM = (
     "You are a job matching assistant for developers with cognitive disabilities. "
-    "Find real, active job postings that match the developer's skills. "
+    "Find real, active job postings that match the user's skills. "
     "Make sure the job listings you return are currently active and open to applications. "
     "The developer may have indicated a preferred work environment, communication style, limitations, accommodations needed, and work values in their profile. "
     "Use this information to find jobs that are not only a good skills match, but also a good overall fit for the developer. "

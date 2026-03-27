@@ -5,6 +5,8 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.permissions import IsAuthenticated
 from .models import User
 from .serializers import UserSerializer
+from mindable.mindable_app.profile_analyzer import analyze_profile  
+from mindable.mindable_app.embeddings import build_user_embeddings   
 
 class RegisterView(APIView):
     def post(self, request):

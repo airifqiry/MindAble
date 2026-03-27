@@ -94,7 +94,6 @@ def analyze_profile(profile_text: str) -> dict[str, Any]:
             message = client.messages.create(
                 model=PROFILE_ANALYSIS_MODEL,
                 max_tokens=1024,
-                temperature=0.2,
                 system=PROFILE_ANALYSIS_SYSTEM,
                 messages=[{"role": "user", "content": content}],
             )
