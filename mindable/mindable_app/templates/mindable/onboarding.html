@@ -20,7 +20,7 @@
     <div class="check-ring"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
     <h2>Profile complete! 🎉</h2>
     <p>Your AI filters are now active. Every job on your board is matched to your neurotype, strengths and what you actually need to thrive.</p>
-    <button class="btn-enter" onclick="window.location.href='mindable-jobs.html'">
+    <button class="btn-enter" onclick="window.location.href='{% url 'jobs' %}'">
       Enter the Job Board
       <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:white;fill:none;stroke-width:2.2;stroke-linecap:round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
     </button>
@@ -28,12 +28,12 @@
 </div>
 
 <nav>
-  <a class="brand" href="mindable-auth.html">
+  <a class="brand" href="{% url 'home' %}">
     <div class="brand-mark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
     MindAble
   </a>
   <span class="nav-tag">Your Profile</span>
-  <a class="nav-back" href="mindable-auth.html">← Back</a>
+  <a class="nav-back" href="{% url 'home' %}">← Back</a>
 </nav>
 
 <main>

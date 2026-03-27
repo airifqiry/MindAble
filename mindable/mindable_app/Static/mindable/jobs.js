@@ -28,9 +28,29 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeMenu();
 });
 
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 // ── Dismiss card
 function dismissCard(btn) {
   const card = btn.closest('.job-card');
+  const jobId = card?.dataset?.jobId;
+
+  // Optimistically update the UI immediately, but also notify the backend.
+  if (jobId) {
+    const csrfToken = getCsrfToken();
+    fetch(`/api/jobs/${jobId}/not-interested/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRFToken': csrfToken
+      }
+    }).catch(err => console.error('Dismiss API failed:', err));
+  }
+
   card.classList.add('dismissed');
   setTimeout(() => {
     card.style.display = 'none';

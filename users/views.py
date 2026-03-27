@@ -1,20 +1,13 @@
+import json
+
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout, authenticate
-from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 
-from .models import User, WorkplaceProfile
-from .forms import (
-    RegisterForm,
-    LoginForm,
-    PassportStep1Form,
-    PassportStep2Form,
-    PassportStep3Form,
-    PassportStep4Form,
-)
-
-from mindable.mindable_app.profile_analyzer import analyze_profile
-from mindable.mindable_app.embedding_service import build_user_embeddings
+from .models import WorkplaceProfile
+from .forms import RegisterForm, LoginForm
 
 
 def register_view(request):
@@ -25,7 +18,7 @@ def register_view(request):
             user.set_password(form.cleaned_data['password'])
             user.save()
             login(request, user)
-            return redirect('passport_step1')
+            return redirect('onboarding')
     else:
         form = RegisterForm()
     return render(request, 'mindable/signup.html', {
@@ -56,105 +49,67 @@ def logout_view(request):
     return redirect('login')
 
 
-# --- Workplace Profile (Passport) Multi-Step Views ---
-
 @login_required
-def passport_step1(request):
-    if request.method == 'POST':
-        form = PassportStep1Form(request.POST)
-        if form.is_valid():
-            request.session['passport_step1'] = form.cleaned_data
-            return redirect('passport_step2')
-    else:
-        form = PassportStep1Form()
-    return render(request, 'mindable/onboarding.html', {'form': form, 'step': 1})
+def home(request):
+    return render(request, 'mindable/dashboard.html')
 
 
 @login_required
-def passport_step2(request):
-    if 'passport_step1' not in request.session:
-        return redirect('passport_step1')
-
-    if request.method == 'POST':
-        form = PassportStep2Form(request.POST)
-        if form.is_valid():
-            request.session['passport_step2'] = form.cleaned_data
-            return redirect('passport_step3')
-    else:
-        form = PassportStep2Form()
-    return render(request, 'mindable/onboarding.html', {'form': form, 'step': 2})
+def jobs(request):
+    return render(request, 'mindable/jobs.html')
 
 
 @login_required
-def passport_step3(request):
-    if 'passport_step2' not in request.session:
-        return redirect('passport_step2')
-
-    if request.method == 'POST':
-        form = PassportStep3Form(request.POST)
-        if form.is_valid():
-            request.session['passport_step3'] = form.cleaned_data
-            return redirect('passport_step4')
-    else:
-        form = PassportStep3Form()
-    return render(request, 'mindable/onboarding.html', {'form': form, 'step': 3})
+def prep(request):
+    return render(request, 'mindable/prep.html')
 
 
 @login_required
-def passport_step4(request):
-    if 'passport_step3' not in request.session:
-        return redirect('passport_step3')
+def onboarding(request):
+    return render(request, 'mindable/onboarding.html')
 
-    if request.method == 'POST':
-        form = PassportStep4Form(request.POST, request.FILES)
-        if form.is_valid():
-            s1 = request.session.get('passport_step1', {})
-            s2 = request.session.get('passport_step2', {})
-            s3 = request.session.get('passport_step3', {})
 
-            # Combine all steps into one text block for Aiya's analyzer.
-            profile_text = "\n".join(filter(None, [
-                s1.get('skills', ''),
-                s1.get('experience_summary', ''),
-                s2.get('mental_disability', ''),
-                " ".join(s3.get('dealbreakers', [])),
-                str(form.cleaned_data.get('success_enablers', '')),
-            ]))
+@login_required
+def basecamp(request):
+    return render(request, 'mindable/dashboard.html')
 
-            # Step 1 — Aiya: extract structured JSON from the profile text.
-            try:
-                profile_json = analyze_profile(profile_text)
-            except (RuntimeError, ValueError):
-                profile_json = {}
 
-            # Step 2 — Ani: generate embeddings from the profile JSON.
-            # Falls back to None if profile is missing required fields.
-            try:
-                skills_embedding, needs_embedding = build_user_embeddings(profile_json)
-            except (ValueError, Exception):
-                skills_embedding = None
-                needs_embedding = None
+@login_required
+@require_POST
+def profile_upsert_api(request):
+    """
+    Single-page onboarding: save/update WorkplaceProfile from JSON payload.
+    """
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON.'}, status=400)
 
-            # Step 3 — Save everything to WorkplaceProfile in one go.
-            WorkplaceProfile.objects.create(
-                user=request.user,
-                skills=s1.get('skills', ''),
-                experience_summary=s1.get('experience_summary', ''),
-                mental_disability=s2.get('mental_disability', ''),
-                dealbreakers=s3.get('dealbreakers', []),
-                success_enablers=form.cleaned_data.get('success_enablers', {}),
-                skills_embedding=skills_embedding,
-                needs_embedding=needs_embedding,
-            )
+    skills = (payload.get('skills') or '').strip()
+    values = (payload.get('values') or '').strip()
+    neurotype = (payload.get('neurotype') or '').strip()
+    disadvantages = (payload.get('disadvantages') or '').strip()
+    enablers = (payload.get('enablers') or '').strip()
 
-            # Clean up session data.
-            for key in ['passport_step1', 'passport_step2', 'passport_step3']:
-                request.session.pop(key, None)
+    if not skills:
+        return JsonResponse({'detail': 'Skills is required.'}, status=400)
 
-            return redirect('basecamp')
-    else:
-        form = PassportStep4Form()
-    return render(request, 'mindable/onboarding.html', {'form': form, 'step': 4})
+    experience_summary = "\n\n".join([part for part in [values, disadvantages] if part])
+
+    profile, _created = WorkplaceProfile.objects.get_or_create(user=request.user)
+    profile.skills = skills
+    profile.experience_summary = experience_summary
+    profile.mental_disability = neurotype
+    profile.success_enablers = {'text': enablers} if enablers else {}
+    profile.save(update_fields=[
+        'skills',
+        'experience_summary',
+        'mental_disability',
+        'success_enablers',
+        'last_updated',
+    ])
+
+    return JsonResponse({'detail': 'Saved.', 'redirect_url': '/jobs/'}, status=200)
 
 
 @login_required

@@ -92,25 +92,28 @@
         <p class="form-title">Welcome back 👋</p>
         <p class="form-sub">No rush. Take your time.</p>
  
-        <div class="field">
-          <label for="l-email">Email address</label>
-          <input type="email" id="l-email" placeholder="you@example.com" autocomplete="email"/>
-        </div>
- 
-        <div class="field">
-          <label for="l-pw">Password</label>
-          <div class="pw-wrap">
-            <input type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password"/>
-            <button class="pw-toggle" onclick="togglePw('l-pw',this)" type="button" aria-label="Toggle password">
-              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
+        <form method="POST" action="{% url 'login' %}">
+          {% csrf_token %}
+          <div class="field">
+            <label for="l-email">Email address</label>
+            <input type="email" id="l-email" name="username" placeholder="you@example.com" autocomplete="email"/>
           </div>
-        </div>
- 
-        <a href="#" class="forgot">Forgot password?</a>
-        <p class="err" id="l-err">Please enter your email and password.</p>
- 
-        <button class="btn-grad" onclick="handleLogin()">Log in to MindAble →</button>
+
+          <div class="field">
+            <label for="l-pw">Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="l-pw" name="password" placeholder="••••••••" autocomplete="current-password"/>
+              <button class="pw-toggle" onclick="togglePw('l-pw',this)" type="button" aria-label="Toggle password">
+                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <a href="#" class="forgot">Forgot password?</a>
+          <p class="err" id="l-err">Please enter your email and password.</p>
+
+          <button class="btn-grad" type="submit">Log in to MindAble →</button>
+        </form>
  
         <div class="divider">or continue with</div>
  

@@ -20,7 +20,8 @@ function jumpTo(i){
 function updateProgress(){
   let firstEmpty = -1;
   fields.forEach((id,i)=>{
-    const filled = document.getElementById(id).value.trim().length > 0;
+    const el = document.getElementById(id);
+    const filled = el && el.value.trim().length > 0;
     const pill = document.getElementById(pillIds[i]);
     pill.classList.remove('done','active');
     if(filled) pill.classList.add('done');
@@ -44,15 +45,74 @@ const io = new IntersectionObserver(entries=>{
 },{threshold:0.4, rootMargin:'-70px 0px -35% 0px'});
 cardIds.forEach(id=>{ const el=document.getElementById(id); if(el) io.observe(el); });
  
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 function submitProfile(){
-  if(!document.getElementById('f-skills').value.trim()){
+  const skillsEl = document.getElementById('f-skills');
+  const valuesEl = document.getElementById('f-values');
+  const neurotypeEl = document.getElementById('f-neurotype');
+  const disadvantagesEl = document.getElementById('f-disadvantages');
+  const enablersEl = document.getElementById('f-enablers');
+
+  const skills = skillsEl ? skillsEl.value.trim() : '';
+  if(!skills){
     const card=document.getElementById('card1');
     card.classList.add('error');
     jumpTo(0);
     setTimeout(()=>card.classList.remove('error'),2000);
     return;
   }
-  document.getElementById('overlay').classList.add('show');
+
+  // Read optional fields (they can be empty).
+  const payload = {
+    skills: skills,
+    values: valuesEl ? valuesEl.value.trim() : '',
+    neurotype: neurotypeEl ? neurotypeEl.value.trim() : '',
+    disadvantages: disadvantagesEl ? disadvantagesEl.value.trim() : '',
+    enablers: enablersEl ? enablersEl.value.trim() : '',
+  };
+
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = overlay?.querySelector('h2');
+  const overlayMsg = overlay?.querySelector('p');
+  if (overlay) overlay.classList.add('show');
+  if (overlayTitle) overlayTitle.textContent = 'Saving your profile...';
+  if (overlayMsg) overlayMsg.textContent = 'One moment while we configure your Workplace Passport.';
+
+  const csrfToken = getCsrfToken();
+  fetch('/api/profile/', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
+    },
+    body: JSON.stringify(payload)
+  }).then(async (res) => {
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`Save failed (${res.status}). ${txt}`);
+    }
+    // User instruction: redirect to /jobs/ after POST.
+    window.location.href = '/jobs/';
+  }).catch((err) => {
+    console.error(err);
+    if (overlayTitle) overlayTitle.textContent = 'Could not save your profile';
+    if (overlayMsg) overlayMsg.textContent = 'Please try again in a moment.';
+  });
 }
- 
-updateProgress();
+
+// Some onboarding HTML variants used a static `.html` redirect.
+// Force the "Enter the Job Board" button to always go to our Django route.
+document.addEventListener('DOMContentLoaded', () => {
+  updateProgress();
+  const btn = document.querySelector('.btn-enter');
+  if (!btn) return;
+  btn.onclick = () => {
+    window.location.href = '/jobs/';
+  };
+});
