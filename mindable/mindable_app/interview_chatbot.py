@@ -173,9 +173,11 @@ def run_interview_turn(
         raise ValueError("No workplace profile found for this user.")
 
     job = None
-    if job_id:
+    if job_id is not None:
         job = Job.objects.filter(id=job_id).first()
-    if not job:
+        if not job:
+            raise ValueError(f"No job with id={job_id} found. Choose a job from your listings.")
+    else:
         job = Job.objects.filter(is_translated=True).order_by("-created_at").first()
     if not job:
         raise ValueError("No job context available for interview prep.")

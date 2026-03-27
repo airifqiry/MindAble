@@ -196,6 +196,14 @@ function renderJobCard(job) {
     summary.appendChild(explain);
   }
   summary.appendChild(tags);
+
+  const prepLink = document.createElement('a');
+  prepLink.className = 'job-prep-link';
+  prepLink.href = `/prep/?job_id=${encodeURIComponent(job.id)}`;
+  prepLink.textContent = 'Practice interview for this role';
+  prepLink.setAttribute('aria-label', `Open interview practice for ${displayTitle}`);
+  summary.appendChild(prepLink);
+
   preview.appendChild(logo);
   preview.appendChild(summary);
 

@@ -29,6 +29,9 @@ class JobListSerializer(serializers.ModelSerializer):
     matched_general_skills = serializers.SerializerMethodField()
     match_tier = serializers.SerializerMethodField()
     matching_mode = serializers.SerializerMethodField()
+    match_quality = serializers.SerializerMethodField()
+    fallback_used = serializers.SerializerMethodField()
+    penalty_total = serializers.SerializerMethodField()
 
     def get_display_title(self, obj):
         return obj.translated_title or obj.title
@@ -88,6 +91,16 @@ class JobListSerializer(serializers.ModelSerializer):
     def get_matching_mode(self, obj):
         return getattr(obj, "_matching_mode", "") or ""
 
+    def get_match_quality(self, obj):
+        return getattr(obj, "_match_quality", "") or ""
+
+    def get_fallback_used(self, obj):
+        return bool(getattr(obj, "_fallback_used", False))
+
+    def get_penalty_total(self, obj):
+        v = getattr(obj, "_penalty_total", None)
+        return v if v is not None else None
+
     class Meta:
         model = Job
         fields = [
@@ -117,6 +130,9 @@ class JobListSerializer(serializers.ModelSerializer):
             'matched_general_skills',
             'match_tier',
             'matching_mode',
+            'match_quality',
+            'fallback_used',
+            'penalty_total',
             'created_at',
         ]
 

@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q, Case, When, IntegerField, QuerySet
 from django.utils import timezone
 from datetime import timedelta
+from math import ceil
 import hashlib
 import logging
 import re
@@ -20,11 +21,13 @@ from mindable.mindable_app.skill_classifier import split_technical_general
 
 logger = logging.getLogger(__name__)
 
-# Suitability: only "strong" and "moderate" tiers are shown; "weak" is filtered out.
+# Suitability tiers (for labeling only — not hard API cutoffs).
 _STRONG_TIER_MIN = 0.55
 _MODERATE_TIER_MIN = 0.43
-# Minimum score to return in the API — no padding below this.
-_MIN_SCORE_TO_SHOW = _MODERATE_TIER_MIN
+# Max share of score that penalties can remove (prevents total collapse).
+_MAX_TOTAL_PENALTY = 0.48
+# Secondary floor used only inside progressive fallback (never a single global gate).
+_FALLBACK_RELAXED_FLOOR = 0.25
 
 
 def _natural_job_key(job: Job) -> str:
@@ -68,7 +71,7 @@ def _filter_by_min_score(
     score_map: dict[int, float],
     min_score: float,
 ) -> list[Job]:
-    """Drop low-scoring jobs; jobs without a score_map entry are dropped (unscored = not shown)."""
+    """Keep jobs whose score is at or above min_score; skip rows without scores."""
     kept: list[Job] = []
     for job in jobs:
         if job.id not in score_map:
@@ -78,50 +81,161 @@ def _filter_by_min_score(
     return kept
 
 
+def _percentile_threshold(scores: list[float], keep_top_fraction: float) -> float:
+    """
+    Minimum score needed to land in the top keep_top_fraction of jobs (e.g. 0.30 => top 30%).
+    Uses the smallest score among the top ceil(fraction * n) jobs.
+    """
+    if not scores:
+        return 0.0
+    if len(scores) == 1:
+        return float(scores[0])
+    sorted_asc = sorted(scores)
+    n = len(sorted_asc)
+    k = max(1, int(ceil(keep_top_fraction * n)))
+    idx = max(0, n - k)
+    return float(sorted_asc[idx])
+
+
+def _label_match_quality(
+    jobs: list[Job],
+    score_map: dict[int, float],
+    *,
+    smax: float,
+    smin: float,
+    stage: str,
+) -> None:
+    """Assign match_quality: high / standard / exploratory (never pretend weak matches are strong)."""
+    spread = max(1e-6, smax - smin)
+    for j in jobs:
+        sc = float(score_map.get(j.id, 0.0))
+        if sc >= smax - 0.08 * spread:
+            q = "high"
+        elif stage in ("relaxed", "exploratory") or sc <= smin + 0.38 * spread:
+            q = "exploratory"
+        else:
+            q = "standard"
+        setattr(j, "_match_quality", q)
+
+
 def _finalize_ranked_feed(
     ranked: list | QuerySet,
     score_map: dict[int, float],
-) -> tuple[list[Job], dict[int, float]]:
+) -> tuple[list[Job], dict[int, float], dict]:
     """
-    Deduplicate by natural key, then keep only jobs at or above minimum suitability.
-    No padding with low-quality matches — fewer results is correct.
+    Dedupe, then progressive filtering with guaranteed non-empty output when candidates exist.
+    Stage 1: percentile-based (top ~30% by score) with a floor for tight distributions.
+    Stage 2: relaxed floor (e.g. 0.25).
+    Stage 3: top-N by score only (exploratory quality label).
     """
+    meta: dict = {
+        "fallback_stage": 0,
+        "effective_threshold": None,
+        "score_min": None,
+        "score_max": None,
+        "score_avg": None,
+    }
     ranked_list = list(ranked) if not isinstance(ranked, list) else ranked
     before = len(ranked_list)
     if not ranked_list:
         logger.info("JOBS_FEED|before=0|after_dedupe=0|after_threshold=0")
-        return [], score_map
+        return [], score_map, meta
 
     deduped, dupes_dropped = _dedupe_jobs_keep_best_score(ranked_list, score_map)
-    filtered = _filter_by_min_score(deduped, score_map, _MIN_SCORE_TO_SHOW)
+    scored_ids = [j.id for j in deduped if j.id in score_map]
+    scores = [float(score_map[jid]) for jid in scored_ids]
 
-    if not filtered:
-        logger.warning(
-            "JOBS_FEED|no_jobs_meet_min_score|before=%s|after_dedupe=%s|min=%.2f|quality_over_quantity",
-            before,
-            len(deduped),
-            _MIN_SCORE_TO_SHOW,
-        )
+    if not scores:
+        logger.warning("JOBS_FEED|no_scores_after_dedupe|returning_top_n_unscored")
+        return deduped[:20], score_map, meta
 
+    smin, smax, savg = min(scores), max(scores), sum(scores) / len(scores)
+    meta["score_min"], meta["score_max"], meta["score_avg"] = smin, smax, savg
     logger.info(
-        "JOBS_FEED|before=%s|after_dedupe=%s|dupes_dropped=%s|after_threshold=%s|min_score=%.2f",
+        "JOBS_FEED|scores|min=%.3f|max=%.3f|avg=%.3f|n=%d|before_dedupe=%d|after_dedupe=%d|dupes=%d",
+        smin,
+        smax,
+        savg,
+        len(scores),
         before,
         len(deduped),
         dupes_dropped,
-        len(filtered),
-        _MIN_SCORE_TO_SHOW,
     )
-    for j in filtered[:5]:
+
+    # Primary: dynamic percentile (top ~30% of jobs) with a floor so tight spreads still return rows.
+    p_top = _percentile_threshold(scores, keep_top_fraction=0.30)
+    spread = smax - smin
+    if spread < 0.06:
+        primary_threshold = max(0.12, smin - 1e-6)
+    else:
+        primary_threshold = max(0.12, min(p_top, smax - 0.02 * spread))
+
+    primary_threshold = min(primary_threshold, smax)
+    meta["effective_threshold"] = primary_threshold
+    filtered = _filter_by_min_score(deduped, score_map, primary_threshold)
+
+    if filtered:
+        meta["fallback_stage"] = 1
         logger.info(
-            "TOP5|title=%s|score=%.3f|tech=%s|general=%s|penalties=%s|tier=%s",
-            j.title,
-            float(score_map.get(j.id, 0.0)),
-            getattr(j, "_matched_technical_skills", []),
-            getattr(j, "_matched_general_skills", []),
-            getattr(j, "_penalties_applied", []),
-            getattr(j, "_match_tier", ""),
+            "JOBS_FEED|filtered|kept=%d|threshold=%.3f|stage=percentile_top30",
+            len(filtered),
+            primary_threshold,
         )
-    return filtered, score_map
+        _label_match_quality(filtered, score_map, smax=smax, smin=smin, stage="primary")
+        for j in filtered[:5]:
+            logger.info(
+                "TOP5|title=%s|score=%.3f|tech=%s|general=%s|penalties=%s|tier=%s",
+                j.title,
+                float(score_map.get(j.id, 0.0)),
+                getattr(j, "_matched_technical_skills", []),
+                getattr(j, "_matched_general_skills", []),
+                getattr(j, "_penalties_applied", []),
+                getattr(j, "_match_tier", ""),
+            )
+        return filtered, score_map, meta
+
+    # Stage 2: lower threshold (never rely on one static 0.43).
+    relaxed = max(0.10, min(_FALLBACK_RELAXED_FLOOR, smin + 0.4 * spread))
+    meta["effective_threshold"] = relaxed
+    filtered = _filter_by_min_score(deduped, score_map, relaxed)
+    logger.warning(
+        "JOBS_FEED|fallback_step2|threshold=%.3f|kept=%d|after_percentile_empty",
+        relaxed,
+        len(filtered),
+    )
+
+    if filtered:
+        meta["fallback_stage"] = 2
+        _label_match_quality(filtered, score_map, smax=smax, smin=smin, stage="relaxed")
+        for j in filtered[:5]:
+            logger.info(
+                "TOP5|title=%s|score=%.3f|tech=%s|general=%s|penalties=%s|tier=%s",
+                j.title,
+                float(score_map.get(j.id, 0.0)),
+                getattr(j, "_matched_technical_skills", []),
+                getattr(j, "_matched_general_skills", []),
+                getattr(j, "_penalties_applied", []),
+                getattr(j, "_match_tier", ""),
+            )
+        return filtered, score_map, meta
+
+    # Stage 3: top N by score — always non-empty if deduped non-empty.
+    top_n = min(20, len(deduped))
+    ordered = sorted(
+        deduped,
+        key=lambda j: float(score_map.get(j.id, 0.0)),
+        reverse=True,
+    )[:top_n]
+    meta["fallback_stage"] = 3
+    meta["effective_threshold"] = None
+    logger.warning(
+        "JOBS_FEED|fallback_triggered|top_n=%d|stage=unfiltered_ranked|quality=exploratory",
+        len(ordered),
+    )
+    for j in ordered:
+        setattr(j, "_match_quality", "exploratory")
+        setattr(j, "_fallback_used", True)
+    return ordered, score_map, meta
 
 
 def _suitability_tier(score: float) -> str:
@@ -263,10 +377,10 @@ def _apply_embedding_ranking(
                 excluded_ids.add(job.id)
                 continue
 
-            limitation_penalty = min(0.55, 0.14 * avoid_hits)
-            behavioral_conflict_penalty = min(0.65, 0.18 * len(conflicts))
-            environment_penalty = 0.14 if any(k in text for k in ["open office", "high pressure", "on-site required"]) else 0.0
-            constraint_penalty_scaled = min(0.92, float(constraint_penalty) * 1.65)
+            environment_penalty = (
+                0.10 if any(k in text for k in ["open office", "high pressure", "on-site required"]) else 0.0
+            )
+            avoid_environment_penalty = min(0.12, 0.04 * min(avoid_hits, 4))
 
             if tech_mode:
                 # MODE A: technical alignment first, then general/support, then preferences — penalties last.
@@ -276,20 +390,21 @@ def _apply_embedding_ranking(
                 n_gen = max(len(gen_pool), 1)
                 general_support = min(1.0, (len(matched_general) + len(matched_strength)) / max(n_gen, 3))
 
-                # Drop roles with no technical signal at all (unless embedding is clearly aligned).
-                if not matched_technical and title_tech_hits == 0 and e_skill < 0.44:
-                    continue
+                # Never exclude the row: demote weak technical fit (prevents empty feeds).
+                tech_weak = not matched_technical and title_tech_hits == 0 and e_skill < 0.44
 
                 positive = (
-                    0.40 * e_skill
-                    + 0.26 * tech_ratio
+                    0.42 * e_skill
+                    + 0.28 * tech_ratio
                     + 0.12 * title_tech_ratio
                     + 0.10 * general_support
-                    + 0.07 * e_needs
-                    + 0.05 * pref_fit
+                    + 0.05 * e_needs
+                    + 0.03 * pref_fit
                 )
-                if tech_ratio < 0.12 and title_tech_ratio < 0.12:
-                    positive *= 0.55
+                if tech_weak:
+                    positive *= 0.38
+                elif tech_ratio < 0.12 and title_tech_ratio < 0.12:
+                    positive *= 0.62
             else:
                 # MODE B: general skills, strengths, embedding — no technical primacy.
                 n_all = max(len(gen_pool) + len(strength_pool), 1)
@@ -318,7 +433,11 @@ def _apply_embedding_ranking(
                     + 0.06 * pref_fit
                 ) * weak_guard + 0.06 * interest_fit
 
-            raw = positive - limitation_penalty - behavioral_conflict_penalty - environment_penalty - constraint_penalty_scaled
+            structured_penalty = min(0.42, float(constraint_penalty) * 0.52)
+            total_penalty = structured_penalty + environment_penalty + avoid_environment_penalty
+            total_penalty = min(_MAX_TOTAL_PENALTY, total_penalty)
+
+            raw = positive - total_penalty
             final_score = max(0.0, min(1.0, raw))
             tier = _suitability_tier(final_score)
 
@@ -348,17 +467,22 @@ def _apply_embedding_ranking(
                     parts.append(f"Profile overlap: {', '.join(overlap[:4])}.")
             if matched_prefs:
                 parts.append(f"Preferences: {', '.join(matched_prefs[:2])}.")
-            if conflicts or limitation_penalty > 0.01 or behavioral_conflict_penalty > 0.01 or constraint_penalty_scaled > 0.01:
+            if conflicts or total_penalty > 0.02:
                 neg_bits = []
                 if conflicts:
-                    neg_bits.append(f"conflicts: {', '.join(conflicts[:3])}")
-                if limitation_penalty > 0.01:
-                    neg_bits.append("limitation/safety overlap")
-                if behavioral_conflict_penalty > 0.01:
-                    neg_bits.append("behavioral fit risk")
-                if constraint_penalty_scaled > 0.01:
-                    neg_bits.append("constraint penalty")
-                parts.append("Penalties: " + "; ".join(neg_bits) + ".")
+                    neg_bits.append(f"conflicts: {', '.join(conflicts[:4])}")
+                if structured_penalty > 0.02:
+                    neg_bits.append(f"structured penalty ({structured_penalty:.2f})")
+                if environment_penalty > 0.02:
+                    neg_bits.append("environment cue penalty")
+                if avoid_environment_penalty > 0.02:
+                    neg_bits.append("avoid-term overlap")
+                parts.append(
+                    "Penalties (capped): total "
+                    + f"{total_penalty:.2f} — "
+                    + "; ".join(neg_bits)
+                    + "."
+                )
             parts.append(f"Suitability: {tier} (score {final_score:.2f}).")
             final_reason = " ".join(parts)
 
@@ -370,11 +494,14 @@ def _apply_embedding_ranking(
                 "matched_strengths": matched_strength,
                 "detected_conflicts": conflicts,
                 "penalties_applied": penalties_applied,
+                "penalty_total": round(total_penalty, 4),
+                "structured_penalty": round(structured_penalty, 4),
                 "final_reason": final_reason,
                 "match_tier": tier,
                 "matching_mode": mode_label,
             }
         except Exception:
+            logger.exception("REC|scoring_failed|job_id=%s", getattr(job, "id", None))
             continue
 
     if not scored:
@@ -404,6 +531,8 @@ def _apply_embedding_ranking(
         setattr(j, "_matched_strengths", details.get("matched_strengths", []))
         setattr(j, "_detected_conflicts", details.get("detected_conflicts", []))
         setattr(j, "_penalties_applied", details.get("penalties_applied", []))
+        setattr(j, "_penalty_total", details.get("penalty_total"))
+        setattr(j, "_structured_penalty", details.get("structured_penalty"))
         setattr(j, "_final_reason", details.get("final_reason", getattr(j, "_match_explanation", "")))
         setattr(j, "_match_tier", details.get("match_tier", _suitability_tier(float(score_map.get(j.id, 0.0)))))
         setattr(j, "_matching_mode", details.get("matching_mode", ""))
@@ -575,7 +704,7 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
         if _term_matches_text(term, text, text_tokens):
             hard_block = True
             conflicts.append(f"hard disqualifier: {term}")
-            penalties.append(f"hard_disqualifier:{term} (-0.95)")
+            penalties.append(f"hard:{term}")
             penalty_score += 0.95
 
     contradiction_rules = [
@@ -587,21 +716,29 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
         (["leadership", "manage"], ["lead", "manager", "supervise", "people management"], "leadership requirement"),
     ]
     user_constraints = set(profile["limitations"] + profile["behavioral_constraints"] + profile["unsuitable_environments"])
+    soft_hits = 0
     for triggers, job_terms, label in contradiction_rules:
         trigger_hit = any(t in user_constraints for t in triggers)
         job_hit = any(jt in text for jt in job_terms)
         if trigger_hit and job_hit:
-            conflicts.append(label)
-            penalties.append(f"constraint_conflict:{label} (-0.38)")
-            penalty_score += 0.38
+            soft_hits += 1
+            conflicts.append(f"soft conflict: {label}")
+            penalties.append(f"soft:{label}")
 
-    for lim in profile["limitations"][:20]:
+    # Cap soft rule stacking: diminishing returns (avoid total collapse).
+    penalty_score += min(0.36, 0.14 * soft_hits + 0.08 * max(0, soft_hits - 2))
+
+    lim_hits = 0
+    for lim in profile["limitations"][:12]:
         if _term_matches_text(lim, text, text_tokens):
+            lim_hits += 1
             conflicts.append(f"limitation overlap: {lim}")
-            penalties.append(f"limitation_overlap:{lim} (-0.16)")
-            penalty_score += 0.16
+            penalties.append(f"soft_limit:{lim}")
+    penalty_score += min(0.22, 0.07 * min(lim_hits, 4))
 
-    return conflicts[:8], penalties[:8], min(1.0, penalty_score), hard_block
+    # Final cap before application layer (second cap also applied in scoring).
+    penalty_score = min(0.92, penalty_score)
+    return conflicts[:10], penalties[:12], penalty_score, hard_block
 
 
 def _ensure_job_embeddings(qs) -> None:
@@ -842,8 +979,16 @@ class JobDiscoveryHubView(generics.ListAPIView):
             except Exception as e:
                 logger.error("refresh after low role alignment failed: %s", e)
 
-        ranked_qs, score_map = _finalize_ranked_feed(ranked_qs, score_map)
+        ranked_qs, score_map, feed_meta = _finalize_ranked_feed(ranked_qs, score_map)
         self._score_map = score_map
+        self._feed_meta = feed_meta
+        logger.info(
+            "JOBS_FEED|pipeline_done|fallback_stage=%s|eff_threshold=%s|score_min=%s|score_max=%s",
+            feed_meta.get("fallback_stage"),
+            feed_meta.get("effective_threshold"),
+            feed_meta.get("score_min"),
+            feed_meta.get("score_max"),
+        )
         return ranked_qs
 
     def list(self, request, *args, **kwargs):
@@ -854,6 +999,7 @@ class JobDiscoveryHubView(generics.ListAPIView):
 
         if page is not None:
             mode = getattr(self, "_matching_mode", "")
+            feed_meta = getattr(self, "_feed_meta", {}) or {}
             for job in page:
                 setattr(job, "_dedupe_key", _natural_job_key(job))
                 setattr(job, "_matching_mode", mode)
@@ -866,7 +1012,13 @@ class JobDiscoveryHubView(generics.ListAPIView):
             payload = {
                 "jobs": serializer.data,
                 "matching_mode": getattr(self, "_matching_mode", "unknown"),
-                "min_suitability_score": _MIN_SCORE_TO_SHOW,
+                "score_distribution": {
+                    "min": feed_meta.get("score_min"),
+                    "max": feed_meta.get("score_max"),
+                    "avg": feed_meta.get("score_avg"),
+                },
+                "effective_threshold": feed_meta.get("effective_threshold"),
+                "fallback_stage": feed_meta.get("fallback_stage"),
                 "count": self.paginator.page.paginator.count,
                 "next": self.paginator.get_next_link(),
                 "previous": self.paginator.get_previous_link(),
@@ -876,6 +1028,7 @@ class JobDiscoveryHubView(generics.ListAPIView):
             return Response(payload)
 
         mode = getattr(self, "_matching_mode", "")
+        feed_meta = getattr(self, "_feed_meta", {}) or {}
         for job in queryset:
             setattr(job, "_dedupe_key", _natural_job_key(job))
             setattr(job, "_matching_mode", mode)
@@ -891,7 +1044,13 @@ class JobDiscoveryHubView(generics.ListAPIView):
             {
                 "jobs": serializer.data,
                 "matching_mode": getattr(self, "_matching_mode", "unknown"),
-                "min_suitability_score": _MIN_SCORE_TO_SHOW,
+                "score_distribution": {
+                    "min": feed_meta.get("score_min"),
+                    "max": feed_meta.get("score_max"),
+                    "avg": feed_meta.get("score_avg"),
+                },
+                "effective_threshold": feed_meta.get("effective_threshold"),
+                "fallback_stage": feed_meta.get("fallback_stage"),
             }
         )
 

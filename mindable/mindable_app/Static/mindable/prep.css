@@ -16,6 +16,45 @@
   }
 }
 
+.prep-job-picker {
+  padding: 0.85rem 1rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.prep-job-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.prep-job-select {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.prep-job-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+  line-height: 1.35;
+}
+
+.prep-code {
+  font-size: 0.85em;
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .prep-layout {
   display: grid;
   grid-template-columns: 1fr;

@@ -4,7 +4,7 @@
 {% block active_page %}chatbot{% endblock %}
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'signup.css' %}"/>
-  <link rel="stylesheet" href="{% static 'prep.css' %}"/>
+  <link rel="stylesheet" href="{% static 'prep.css' %}?v=8"/>
 {% endblock %}
 {% block content %}
   <div class="bg">
@@ -18,6 +18,17 @@
       <section class="prep-chat prep-panel reveal">
         <div class="chat-header">
           <p class="chat-topic" id="current-topic">Interview Coach</p>
+        </div>
+
+        <div class="prep-job-picker" id="prep-job-picker-wrap">
+          <label class="prep-job-label" for="prep-job-select">Practice interview for</label>
+          <select id="prep-job-select" class="prep-job-select" aria-label="Choose which job listing to practice for">
+            <option value="">Loading your listings…</option>
+          </select>
+          <p class="prep-job-hint" id="prep-job-hint" hidden>
+            You can also open this page from a job card with “Practice interview for this role,” or add
+            <code class="prep-code">?job_id=123</code> to the URL.
+          </p>
         </div>
 
         <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
@@ -41,6 +52,6 @@
   </main>
 {% endblock %}
 {% block extra_js %}
-  <script src="{% static 'prep.js' %}"></script>
+  <script src="{% static 'prep.js' %}?v=8"></script>
 {% endblock %}
 

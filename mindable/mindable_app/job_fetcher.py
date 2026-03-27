@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import ssl
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -9,6 +11,25 @@ from itertools import islice
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _ssl_context_for_https() -> ssl.SSLContext:
+    """
+    Use certifi's CA bundle so HTTPS works on macOS / Windows where the
+    default Python install may not trust remote APIs (fixes CERTIFICATE_VERIFY_FAILED).
+    Set MINDABLE_INSECURE_SSL=1 only for local debugging (disables verification).
+    """
+    if os.environ.get("MINDABLE_INSECURE_SSL", "").lower() in ("1", "true", "yes"):
+        logger.warning(
+            "MINDABLE_INSECURE_SSL is set — HTTPS certificate verification is disabled (dev only)."
+        )
+        return ssl._create_unverified_context()
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
 
 _HIMALAYAS_SEARCH_URL = "https://himalayas.app/jobs/api/search"
 _ARBEITNOW_URL = "https://www.arbeitnow.com/api/job-board-api"
@@ -50,15 +71,20 @@ def _build_search_queries(skills: list[str]) -> list[str]:
 def _fetch_url(url: str) -> dict:
     req = urllib.request.Request(
         url,
-        headers={'User-Agent': 'Mozilla/5.0 (compatible; Mindable/1.0)'}
+        headers={"User-Agent": "Mozilla/5.0 (compatible; Mindable/1.0)"},
     )
+    ctx = _ssl_context_for_https()
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
             return json.loads(response.read())
     except urllib.error.URLError:
         # Some environments inject an HTTPS proxy that blocks these APIs.
-        # Retry once without proxies to keep real-source fetching reliable.
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        # Retry once without proxies; keep same SSL context (certifi / macOS fix).
+        https_handler = urllib.request.HTTPSHandler(context=ctx)
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            https_handler,
+        )
         with opener.open(req, timeout=15) as response:
             return json.loads(response.read())
 

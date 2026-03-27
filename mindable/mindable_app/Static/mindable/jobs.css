@@ -278,6 +278,19 @@ nav.scrolled { box-shadow: 0 4px 30px rgba(91,127,255,.1); }
 .job-card:nth-child(4) { animation-delay: .2s; }
 .job-card:nth-child(5) { animation-delay: .25s; }
 
+.job-prep-link {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--purple);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.job-prep-link:hover {
+  border-bottom-color: var(--purple);
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   nav { padding: 0 1.2rem; }
