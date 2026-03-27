@@ -25,7 +25,7 @@ def register_view(request):
             return redirect('passport_step1')
     else:
         form = RegisterForm()
-    return render(request, 'auth.html', {
+    return render(request, 'signup.html', {
         'register_form': form,
         'login_form': LoginForm(),
         'active_tab': 'register'
@@ -40,7 +40,7 @@ def login_view(request):
             return redirect('basecamp')
     else:
         form = LoginForm()
-    return render(request, 'auth.html', {
+    return render(request, 'signup.html', {
         'login_form': form,
         'register_form': RegisterForm(),
         'active_tab': 'login'
