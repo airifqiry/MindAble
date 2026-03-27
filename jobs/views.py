@@ -22,12 +22,63 @@ from mindable.mindable_app.skill_classifier import split_technical_general
 logger = logging.getLogger(__name__)
 
 # Suitability tiers (for labeling only — not hard API cutoffs).
-_STRONG_TIER_MIN = 0.55
-_MODERATE_TIER_MIN = 0.43
-# Max share of score that penalties can remove (prevents total collapse).
-_MAX_TOTAL_PENALTY = 0.48
+_STRONG_TIER_MIN = 0.52
+_MODERATE_TIER_MIN = 0.40
+# Max fractional dampening from penalties: final = positive * (1 - min(MAX, total_penalty)).
+# Subtractive penalty + long skill lists was compressing almost everything below ~40%.
+_MAX_TOTAL_PENALTY = 0.34
 # Secondary floor used only inside progressive fallback (never a single global gate).
 _FALLBACK_RELAXED_FLOOR = 0.25
+
+# API "fit %" is a calibrated display derived from raw model scores (rank is unchanged).
+_DISPLAY_FIT_LOW = 0.52
+_DISPLAY_FIT_HIGH = 0.93
+
+
+def _calibrated_display_fit(
+    raw: float,
+    smin: float | None,
+    smax: float | None,
+) -> float:
+    """
+    Map compressed internal scores into a user-facing [low, high] band using cohort
+    min/max so the best jobs in the pool read as a strong match while preserving order.
+    """
+    raw = max(0.0, min(1.0, float(raw)))
+    if smin is None or smax is None:
+        return min(
+            1.0,
+            _DISPLAY_FIT_LOW + (_DISPLAY_FIT_HIGH - _DISPLAY_FIT_LOW) * (raw ** 0.50),
+        )
+    lo, hi = float(smin), float(smax)
+    spread = hi - lo
+    if spread < 1e-5:
+        return min(
+            1.0,
+            _DISPLAY_FIT_LOW + (_DISPLAY_FIT_HIGH - _DISPLAY_FIT_LOW) * (raw ** 0.52),
+        )
+    t = (raw - lo) / spread
+    t = max(0.0, min(1.0, t))
+    curved = t**0.88
+    return _DISPLAY_FIT_LOW + (_DISPLAY_FIT_HIGH - _DISPLAY_FIT_LOW) * curved
+
+
+def _suitability_tier_display(display_fit: float) -> str:
+    """Labels aligned to calibrated fit % (not raw model score)."""
+    if display_fit >= 0.84:
+        return "strong"
+    if display_fit >= 0.68:
+        return "moderate"
+    return "exploratory"
+
+
+def _match_quality_display(display_fit: float) -> str:
+    """Card quality label consistent with calibrated match_score."""
+    if display_fit >= 0.86:
+        return "high"
+    if display_fit <= 0.62:
+        return "exploratory"
+    return "standard"
 
 
 def _natural_job_key(job: Job) -> str:
@@ -243,7 +294,29 @@ def _suitability_tier(score: float) -> str:
         return "strong"
     if score >= _MODERATE_TIER_MIN:
         return "moderate"
-    return "weak"
+    return "exploratory"
+
+
+def _public_match_intro(tech_mode: bool) -> str:
+    if tech_mode:
+        return "We compared this posting to your skills and workplace preferences."
+    return "We compared this posting to your profile and preferences."
+
+
+def _public_fit_closing(raw_model_score: float) -> str:
+    """Closing line for job cards: no raw numbers, no negative 'weak' framing."""
+    if raw_model_score >= _STRONG_TIER_MIN:
+        return "Several of your strengths line up well with this role."
+    if raw_model_score >= _MODERATE_TIER_MIN:
+        return "There is meaningful overlap between your profile and this posting."
+    return "Overlap is more limited, but the role may still be worth a look if it interests you."
+
+
+def _public_match_caveat_note() -> str:
+    return (
+        "Some details in the listing may be a mixed fit for your preferences — "
+        "read the full description before deciding."
+    )
 
 
 class JobDiscoveryPagination(PageNumberPagination):
@@ -287,6 +360,54 @@ def _extract_skills(user_skills_raw: str) -> list[str]:
         keywords.insert(0, "ai")
 
     return keywords[:10]
+
+
+def _cosine_to_unit_interval(raw: float) -> float:
+    """Map raw cosine similarity [-1, 1] to [0, 1] for blending."""
+    return max(0.0, min(1.0, (float(raw) + 1.0) / 2.0))
+
+
+def _overlap_ratio(matches: int, pool_len: int, *, cap: int = 10, min_denom: int = 3) -> float:
+    """
+    Fraction of a skill pool matched, with a capped denominator so long analyzed profiles
+    (dozens of skills) do not collapse overlap to near zero for normal listings.
+    """
+    if pool_len <= 0:
+        return 0.0
+    denom = max(min_denom, min(pool_len, cap))
+    return min(1.0, int(matches) / float(denom))
+
+
+def _fuse_embedding_with_lexical(
+    raw_skills_cos: float,
+    raw_needs_cos: float,
+    *,
+    tech_mode: bool,
+    tech_ratio: float,
+    title_tech_ratio: float,
+    general_lex: float,
+    lexical_skill_fit: float,
+) -> tuple[float, float]:
+    """
+    Hash / bag-style embeddings often sit in a modest cosine band and understate obvious
+    keyword overlap. Fuse lexical agreement into the embedding channel so scores track
+    visible skill fit; ranking stays driven by the same signals, but % is better calibrated.
+    """
+    e_sk = _cosine_to_unit_interval(raw_skills_cos)
+    e_nd = _cosine_to_unit_interval(raw_needs_cos)
+
+    if tech_mode:
+        lex = min(1.0, 0.72 * float(tech_ratio) + 0.28 * float(title_tech_ratio))
+    else:
+        lex = min(1.0, 0.58 * float(general_lex) + 0.42 * float(lexical_skill_fit))
+
+    # More lexical overlap → trust "lift" more (cap so pure embedding-only rows still differ).
+    mix = min(0.62, 0.26 + 0.58 * lex)
+    lex_floor = 0.12 + 0.88 * lex
+    e_sk_fused = min(1.0, (1.0 - mix) * e_sk + mix * max(e_sk, lex_floor))
+    e_nd_fused = min(1.0, 0.78 * e_nd + 0.22 * max(e_nd, 0.18 + 0.82 * lex))
+
+    return e_sk_fused, e_nd_fused
 
 
 def _apply_embedding_ranking(
@@ -338,9 +459,6 @@ def _apply_embedding_ranking(
                 except Exception:
                     raw_needs_score = 0.0
 
-            e_skill = float((raw_skills_score + 1.0) / 2.0)
-            e_needs = float((raw_needs_score + 1.0) / 2.0)
-
             text = _job_text(job)
             text_tokens = set(_extract_skills(text))
             title_text = (job.title or "").lower()
@@ -377,40 +495,52 @@ def _apply_embedding_ranking(
                 excluded_ids.add(job.id)
                 continue
 
-            environment_penalty = (
-                0.10 if any(k in text for k in ["open office", "high pressure", "on-site required"]) else 0.0
+            n_tech = max(len(tech_pool), 1)
+            n_tech_denom = max(2, min(4, (min(n_tech, 12) + 1) // 2))
+            tech_ratio = _overlap_ratio(len(matched_technical), n_tech, cap=10, min_denom=3)
+            title_tech_ratio = min(1.0, title_tech_hits / float(n_tech_denom))
+            n_gen = max(len(gen_pool), 1)
+            gen_strength_hits = len(matched_general) + len(matched_strength)
+            general_support = _overlap_ratio(gen_strength_hits, n_gen, cap=10, min_denom=3)
+            n_all = max(len(gen_pool) + len(strength_pool), 1)
+            general_lex = _overlap_ratio(gen_strength_hits, n_all, cap=12, min_denom=2)
+            n_skills_profile = max(len(profile["skills"]), 1)
+            skill_fit_denom = max(4, min(10, n_skills_profile))
+            lexical_skill_fit = min(1.0, keyword_hits / float(skill_fit_denom))
+
+            e_skill, e_needs = _fuse_embedding_with_lexical(
+                raw_skills_score,
+                raw_needs_score,
+                tech_mode=tech_mode,
+                tech_ratio=tech_ratio,
+                title_tech_ratio=title_tech_ratio,
+                general_lex=general_lex,
+                lexical_skill_fit=lexical_skill_fit,
             )
-            avoid_environment_penalty = min(0.12, 0.04 * min(avoid_hits, 4))
+
+            environment_penalty = (
+                0.08 if any(k in text for k in ["open office", "high pressure", "on-site required"]) else 0.0
+            )
+            avoid_environment_penalty = min(0.10, 0.035 * min(avoid_hits, 4))
 
             if tech_mode:
-                # MODE A: technical alignment first, then general/support, then preferences — penalties last.
-                n_tech = max(len(tech_pool), 1)
-                tech_ratio = min(1.0, len(matched_technical) / n_tech)
-                title_tech_ratio = min(1.0, title_tech_hits / max(2, min(4, (len(tech_pool) + 1) // 2)))
-                n_gen = max(len(gen_pool), 1)
-                general_support = min(1.0, (len(matched_general) + len(matched_strength)) / max(n_gen, 3))
-
-                # Never exclude the row: demote weak technical fit (prevents empty feeds).
-                tech_weak = not matched_technical and title_tech_hits == 0 and e_skill < 0.44
+                # MODE A: technical + fused embedding; lexical fusion already lifted e_skill when keywords match.
+                tech_weak = not matched_technical and title_tech_hits == 0 and e_skill < 0.40
 
                 positive = (
-                    0.42 * e_skill
-                    + 0.28 * tech_ratio
+                    0.40 * e_skill
+                    + 0.30 * tech_ratio
                     + 0.12 * title_tech_ratio
                     + 0.10 * general_support
                     + 0.05 * e_needs
                     + 0.03 * pref_fit
                 )
                 if tech_weak:
-                    positive *= 0.38
-                elif tech_ratio < 0.12 and title_tech_ratio < 0.12:
-                    positive *= 0.62
+                    positive *= 0.45
+                elif tech_ratio < 0.10 and title_tech_ratio < 0.10:
+                    positive *= 0.82
             else:
-                # MODE B: general skills, strengths, embedding — no technical primacy.
-                n_all = max(len(gen_pool) + len(strength_pool), 1)
-                general_lex = min(1.0, (len(matched_general) + len(matched_strength)) / n_all)
-                n_skills_profile = max(len(profile["skills"]), 1)
-                lexical_skill_fit = min(1.0, keyword_hits / min(8, n_skills_profile))
+                # MODE B: general skills + fused embedding (hash embeddings get lexical lift here too).
                 title_fit = min(1.0, title_hits / 4.0)
 
                 signal_count = sum(
@@ -419,26 +549,26 @@ def _apply_embedding_ranking(
                         1 if title_hits else 0,
                         1 if pref_hits else 0,
                         1 if matched_interests else 0,
-                        1 if e_skill >= 0.58 else 0,
+                        1 if e_skill >= 0.55 else 0,
                     ]
                 )
-                weak_guard = 0.52 if signal_count < 2 else 1.0
+                weak_guard = 0.70 if signal_count < 2 else 1.0
 
                 positive = (
-                    0.32 * e_skill
+                    0.34 * e_skill
                     + 0.22 * e_needs
-                    + 0.20 * general_lex
+                    + 0.22 * general_lex
                     + 0.12 * lexical_skill_fit
-                    + 0.08 * title_fit
-                    + 0.06 * pref_fit
+                    + 0.06 * title_fit
+                    + 0.04 * pref_fit
                 ) * weak_guard + 0.06 * interest_fit
 
-            structured_penalty = min(0.42, float(constraint_penalty) * 0.52)
+            structured_penalty = min(0.32, float(constraint_penalty) * 0.36)
             total_penalty = structured_penalty + environment_penalty + avoid_environment_penalty
             total_penalty = min(_MAX_TOTAL_PENALTY, total_penalty)
 
-            raw = positive - total_penalty
-            final_score = max(0.0, min(1.0, raw))
+            damp = min(_MAX_TOTAL_PENALTY, float(total_penalty))
+            final_score = max(0.0, min(1.0, float(positive) * (1.0 - damp)))
             tier = _suitability_tier(final_score)
 
             scored.append((job.id, final_score))
@@ -449,12 +579,12 @@ def _apply_embedding_ranking(
                 "_match_avoid_hits": avoid_hits,
             }
 
-            parts: list[str] = [f"Matching mode: {mode_label}."]
+            parts: list[str] = [_public_match_intro(tech_mode)]
             if tech_mode:
                 if matched_technical:
                     parts.append(f"Technical overlap: {', '.join(matched_technical[:4])}.")
                 elif title_tech_hits:
-                    parts.append(f"Technical signals in title ({title_tech_hits}) plus embedding alignment.")
+                    parts.append("Your skills also show up in the job title.")
                 if matched_general or matched_strength:
                     parts.append(
                         "Supporting overlap: "
@@ -468,22 +598,8 @@ def _apply_embedding_ranking(
             if matched_prefs:
                 parts.append(f"Preferences: {', '.join(matched_prefs[:2])}.")
             if conflicts or total_penalty > 0.02:
-                neg_bits = []
-                if conflicts:
-                    neg_bits.append(f"conflicts: {', '.join(conflicts[:4])}")
-                if structured_penalty > 0.02:
-                    neg_bits.append(f"structured penalty ({structured_penalty:.2f})")
-                if environment_penalty > 0.02:
-                    neg_bits.append("environment cue penalty")
-                if avoid_environment_penalty > 0.02:
-                    neg_bits.append("avoid-term overlap")
-                parts.append(
-                    "Penalties (capped): total "
-                    + f"{total_penalty:.2f} — "
-                    + "; ".join(neg_bits)
-                    + "."
-                )
-            parts.append(f"Suitability: {tier} (score {final_score:.2f}).")
+                parts.append(_public_match_caveat_note())
+            parts.append(_public_fit_closing(final_score))
             final_reason = " ".join(parts)
 
             explanation_map[job.id] = final_reason
@@ -734,7 +850,7 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
             lim_hits += 1
             conflicts.append(f"limitation overlap: {lim}")
             penalties.append(f"soft_limit:{lim}")
-    penalty_score += min(0.22, 0.07 * min(lim_hits, 4))
+    penalty_score += min(0.15, 0.045 * min(lim_hits, 4))
 
     # Final cap before application layer (second cap also applied in scoring).
     penalty_score = min(0.92, penalty_score)
@@ -1000,14 +1116,18 @@ class JobDiscoveryHubView(generics.ListAPIView):
         if page is not None:
             mode = getattr(self, "_matching_mode", "")
             feed_meta = getattr(self, "_feed_meta", {}) or {}
+            smin_m = feed_meta.get("score_min")
+            smax_m = feed_meta.get("score_max")
             for job in page:
                 setattr(job, "_dedupe_key", _natural_job_key(job))
                 setattr(job, "_matching_mode", mode)
                 if job.id in score_map:
-                    sc = float(score_map[job.id])
-                    setattr(job, "_match_score", sc)
-                    if not getattr(job, "_match_tier", None):
-                        setattr(job, "_match_tier", _suitability_tier(sc))
+                    raw_sc = float(score_map[job.id])
+                    disp = _calibrated_display_fit(raw_sc, smin_m, smax_m)
+                    setattr(job, "_match_score_raw", raw_sc)
+                    setattr(job, "_match_score", disp)
+                    setattr(job, "_match_tier", _suitability_tier_display(disp))
+                    setattr(job, "_match_quality", _match_quality_display(disp))
             serializer = self.get_serializer(page, many=True)
             payload = {
                 "jobs": serializer.data,
@@ -1016,6 +1136,10 @@ class JobDiscoveryHubView(generics.ListAPIView):
                     "min": feed_meta.get("score_min"),
                     "max": feed_meta.get("score_max"),
                     "avg": feed_meta.get("score_avg"),
+                    "model_score_min": feed_meta.get("score_min"),
+                    "model_score_max": feed_meta.get("score_max"),
+                    "match_score_is_calibrated": True,
+                    "display_fit_range": [_DISPLAY_FIT_LOW, _DISPLAY_FIT_HIGH],
                 },
                 "effective_threshold": feed_meta.get("effective_threshold"),
                 "fallback_stage": feed_meta.get("fallback_stage"),
@@ -1029,14 +1153,18 @@ class JobDiscoveryHubView(generics.ListAPIView):
 
         mode = getattr(self, "_matching_mode", "")
         feed_meta = getattr(self, "_feed_meta", {}) or {}
+        smin_m = feed_meta.get("score_min")
+        smax_m = feed_meta.get("score_max")
         for job in queryset:
             setattr(job, "_dedupe_key", _natural_job_key(job))
             setattr(job, "_matching_mode", mode)
             if job.id in score_map:
-                sc = float(score_map[job.id])
-                setattr(job, "_match_score", sc)
-                if not getattr(job, "_match_tier", None):
-                    setattr(job, "_match_tier", _suitability_tier(sc))
+                raw_sc = float(score_map[job.id])
+                disp = _calibrated_display_fit(raw_sc, smin_m, smax_m)
+                setattr(job, "_match_score_raw", raw_sc)
+                setattr(job, "_match_score", disp)
+                setattr(job, "_match_tier", _suitability_tier_display(disp))
+                setattr(job, "_match_quality", _match_quality_display(disp))
         serializer = self.get_serializer(queryset, many=True)
         logger.info("Job API returning %d jobs (non-paginated).", len(serializer.data))
         print("DEBUG: API jobs returned:", len(serializer.data))
@@ -1048,6 +1176,10 @@ class JobDiscoveryHubView(generics.ListAPIView):
                     "min": feed_meta.get("score_min"),
                     "max": feed_meta.get("score_max"),
                     "avg": feed_meta.get("score_avg"),
+                    "model_score_min": feed_meta.get("score_min"),
+                    "model_score_max": feed_meta.get("score_max"),
+                    "match_score_is_calibrated": True,
+                    "display_fit_range": [_DISPLAY_FIT_LOW, _DISPLAY_FIT_HIGH],
                 },
                 "effective_threshold": feed_meta.get("effective_threshold"),
                 "fallback_stage": feed_meta.get("fallback_stage"),
