@@ -20,12 +20,12 @@ class JobFeedback(models.Model):
         related_name='feedback'
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-    note = models.TextField(blank=True)       # optional personal note
+    note = models.TextField(blank=True)       
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('user', 'job')     # one feedback per user per job
+        unique_together = ('user', 'job')     
 
     def str(self):
         return f"{self.user} → {self.job} [{self.status}]"
