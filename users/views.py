@@ -17,7 +17,6 @@ def register_view(request):
             user.save()
             login(request, user)
             return redirect('onboarding')
-        # If form invalid, fall through to render with errors
     else:
         form = RegisterForm()
     return render(request, 'mindable/signup.html', {
@@ -34,7 +33,6 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             return redirect('basecamp')
-        # If invalid, fall through to render with errors
     else:
         form = LoginForm()
     return render(request, 'mindable/signup.html', {
@@ -82,11 +80,11 @@ def profile_upsert_api(request):
     except json.JSONDecodeError:
         return JsonResponse({'detail': 'Invalid JSON.'}, status=400)
 
-    skills     = (payload.get('skills')        or '').strip()
-    values     = (payload.get('values')        or '').strip()
-    neurotype  = (payload.get('neurotype')     or '').strip()
+    skills        = (payload.get('skills')        or '').strip()
+    values        = (payload.get('values')        or '').strip()
+    neurotype     = (payload.get('neurotype')     or '').strip()
     disadvantages = (payload.get('disadvantages') or '').strip()
-    enablers   = (payload.get('enablers')      or '').strip()
+    enablers      = (payload.get('enablers')      or '').strip()
 
     if not skills:
         return JsonResponse({'detail': 'Skills is required.'}, status=400)
@@ -98,11 +96,29 @@ def profile_upsert_api(request):
     profile.experience_summary = experience_summary
     profile.mental_disability  = neurotype
     profile.success_enablers   = {'text': enablers} if enablers else {}
+
+    profile_text = " ".join(filter(None, [skills, values, neurotype, disadvantages, enablers]))
+
+    try:
+        from mindable.mindable_app.profile_analyzer import analyze_profile
+        from mindable.mindable_app.embedding_service import build_user_embeddings
+
+        analyzed = analyze_profile(profile_text)
+        skills_emb, needs_emb = build_user_embeddings(analyzed)
+        profile.skills_embedding = skills_emb
+        profile.needs_embedding  = needs_emb
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'detail': f'Embedding failed: {str(e)}'}, status=500)
+
     profile.save(update_fields=[
         'skills',
         'experience_summary',
         'mental_disability',
         'success_enablers',
+        'skills_embedding',
+        'needs_embedding',
         'last_updated',
     ])
 
