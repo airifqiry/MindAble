@@ -45,8 +45,9 @@ function goStep(n) {
     const ln = document.getElementById('su-ln').value.trim();
     const em = document.getElementById('su-em').value.trim();
     const pw = document.getElementById('su-pw').value;
+    const pw2 = document.getElementById('su-pw-confirm').value;
     const err = document.getElementById('s0-err');
-    if (!fn||!ln||!em||pw.length<8) { err.classList.add('on'); return; }
+    if (!fn||!ln||!em||pw.length<8||pw !== pw2) { err.classList.add('on'); return; }
     err.classList.remove('on');
   }
   document.getElementById('s'+step).classList.remove('active');
@@ -72,7 +73,17 @@ function handleSignup() {
   const err = document.getElementById('s2-err');
   if (isNaN(amt)||amt<0.50) { err.classList.add('on'); return; }
   err.classList.remove('on');
-  document.getElementById('s2').classList.remove('active');
-  document.getElementById('d2').classList.remove('active');
-  document.getElementById('success').classList.add('on');
+
+  const pw = document.getElementById('su-pw').value;
+  const pw2 = document.getElementById('su-pw-confirm').value;
+  const s0err = document.getElementById('s0-err');
+  if (!pw || pw.length < 8 || pw !== pw2) { s0err.classList.add('on'); return; }
+  s0err.classList.remove('on');
+
+  // Django expects `username`, `email`, `password`, `confirm_password`.
+  const email = document.getElementById('su-em').value.trim();
+  document.getElementById('su-username').value = email;
+
+  const form = document.getElementById('signup-form');
+  if (form) form.submit();
 }

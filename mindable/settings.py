@@ -126,11 +126,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 # Static files
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'mindable' / 'mindable_app' / 'Static']
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'mindable' / 'mindable_app' / 'Static' / 'mindable']
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Redirect unauthenticated users to our custom login page.
+LOGIN_URL = '/login/'

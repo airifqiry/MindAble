@@ -52,44 +52,96 @@ function setTyping(isTyping) {
   indicator.hidden = !isTyping;
 }
 
-function warmResponse(topicId, userText) {
-  const energy = getEnergy();
-  const brief = energy === 'low';
-  const detailed = energy === 'high';
+let prepJobId = null;
+let prepFeedbackByJobId = null;
 
-  const lead = 'Thanks for sharing. You’re doing a really solid job putting it into words.';
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
 
-  if (topicId === 'about-yourself') {
-    if (brief) {
-      return `${lead}\n\nA simple structure: (1) what you do best, (2) how you work, (3) what you’re looking for next.`;
-    }
-    if (detailed) {
-      return `${lead}\n\nTry this flow:\n1) One line on your strengths\n2) A specific example (what you did, what improved)\n3) How you like to work (communication + pace)\n4) What you want next (fit + impact)\n\nIf you want, paste your draft and I’ll help you tighten it gently.`;
-    }
-    return `${lead}\n\nStructure that usually lands well:\n- Strength\n- Example\n- What you need to thrive (calm pace, clear instructions, etc.)`;
+async function ensurePrepJobId() {
+  if (prepJobId) return prepJobId;
+
+  const res = await fetch('/api/jobs/?page=1', {
+    credentials: 'same-origin',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const jobs = Array.isArray(data) ? data : (data.results || data.jobs || []);
+  prepJobId = jobs?.[0]?.id ?? null;
+  return prepJobId;
+}
+
+async function ensureFeedbackMap(jobId) {
+  if (prepFeedbackByJobId) return prepFeedbackByJobId;
+
+  const res = await fetch('/api/feedback/', {
+    credentials: 'same-origin',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) {
+    prepFeedbackByJobId = {};
+    return prepFeedbackByJobId;
   }
 
-  if (topicId === 'strengths-challenges') {
-    if (brief) {
-      return `${lead}\n\nKeep challenges framed as “needs” (what makes it easier) rather than “failures.” A calm sentence + a supportive adjustment works well.`;
-    }
-    if (detailed) {
-      return `${lead}\n\nA good interview-ready pattern:\n1) Strength (what you do consistently)\n2) Evidence (a moment it helped)\n3) Challenge (what gets hard)\n4) Adjustment (a clear accommodation)\n5) Result (how it improves)\n\nWant to tell me your biggest strength first?`;
-    }
-    return `${lead}\n\nFor challenges, aim for: “When X happens, I do best with Y.” That keeps it honest and protective.`;
+  const data = await res.json();
+  const list = Array.isArray(data) ? data : (data.results || []);
+  prepFeedbackByJobId = {};
+  list.forEach(item => {
+    if (item?.job != null) prepFeedbackByJobId[String(item.job)] = item;
+  });
+  return prepFeedbackByJobId;
+}
+
+// Backend-wired response: saves the user's note via /api/feedback/.
+// NOTE: The current backend stores JobFeedback (job + status + note), not an AI-generated response.
+async function warmResponse(topicId, userText) {
+  const jobId = await ensurePrepJobId();
+  if (!jobId) return 'No job context found yet. Please check your job board first.';
+
+  const csrfToken = getCsrfToken();
+  const payload = { job: jobId, status: 'saved', note: userText };
+
+  const feedbackMap = await ensureFeedbackMap(jobId);
+  const existing = feedbackMap[String(jobId)];
+
+  let res;
+  if (existing) {
+    res = await fetch(`/api/feedback/${existing.id}/`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify(payload)
+    });
+  } else {
+    res = await fetch('/api/feedback/', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify(payload)
+    });
   }
 
-  if (topicId === 'workplace-needs') {
-    if (brief) {
-      return `${lead}\n\nTurn needs into interview-friendly priorities: environment, communication style, and scheduling. Keep it concrete and kind.`;
-    }
-    if (detailed) {
-      return `${lead}\n\nLet’s turn your needs into a short “workplace passport”:\n- Environment (quiet/open, noise level)\n- Communication (written vs meetings, response times)\n- Rhythm (start times, predictability, meeting cadence)\n- Boundaries (what you need respected)\n\nReply with one example situation and we’ll polish it.`;
-    }
-    return `${lead}\n\nA useful way to phrase this: “I thrive when…” then name 2-3 conditions (communication + pace are a great start).`;
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    return `Could not save your prep message. (${res.status}) ${txt}`;
   }
 
-  return `${lead}\n\nTell me a bit more, and we’ll shape it into a calm, clear answer.`;
+  const data = await res.json();
+  // Show a simple confirmation using backend response.
+  if (data?.note) return `Saved. ${data.note}`;
+  return 'Saved.';
 }
 
 function initPrep() {
@@ -141,8 +193,8 @@ function initPrep() {
     input.value = '';
 
     const delay = 850 + Math.random() * 650;
-    window.setTimeout(() => {
-      const response = warmResponse(topicId, text);
+    window.setTimeout(async () => {
+      const response = await warmResponse(topicId, text);
       appendBubble({ role: 'ai', text: response });
       setTyping(false);
       isThinking = false;

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="{% static 'mindable/jobs.css' %}"/>
+<link rel="stylesheet" href="{% static 'jobs.css' %}"/>
 </head>
 <body>
 
@@ -21,7 +21,7 @@
 
 <!-- ── NAV ── -->
 <nav id="navbar">
-  <a href="./home.html" class="nav-brand">
+  <a href="{% url 'home' %}" class="nav-brand">
     <div class="nav-logo">
       <svg viewBox="0 0 24 24"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
     </div>
@@ -34,11 +34,11 @@
 
 <!-- ── NAV DROPDOWN PANEL ── -->
 <div id="nav-menu-panel" hidden>
-  <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
-  <a href="./jobs.html" data-page="jobs" class="nav-menu-link active">Job Listings</a>
-  <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
-  <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
-  <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+  <a href="{% url 'home' %}" data-page="home" class="nav-menu-link">Home</a>
+  <a href="{% url 'jobs' %}" data-page="jobs" class="nav-menu-link active">Job Listings</a>
+  <a href="{% url 'prep' %}" data-page="prep" class="nav-menu-link">Interview Prep</a>
+  <a href="{% url 'home' %}#profile" data-page="profile" class="nav-menu-link">Profile</a>
+  <a href="{% url 'logout' %}" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
 </div>
 
 <!-- ── PAGE ── -->
@@ -70,7 +70,7 @@
 
 </main>
 
-<script src="{% static 'mindable/jobs.js' %}"></script>
+<script src="{% static 'jobs.js' %}"></script>
 </body>
 </html>
 

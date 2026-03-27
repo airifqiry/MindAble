@@ -124,6 +124,9 @@
  
       <!-- ══ SIGN UP ══ -->
       <div class="form-panel" id="panel-signup">
+        <form id="signup-form" method="POST" action="{% url 'register' %}">
+          {% csrf_token %}
+          <input type="hidden" id="su-username" name="username" value=""/>
  
         <!-- step dots -->
         <div class="step-dots">
@@ -142,18 +145,23 @@
             <div class="field"><label for="su-ln">Last name</label><input type="text" id="su-ln" placeholder="Jordan" autocomplete="family-name"/></div>
           </div>
  
-          <div class="field"><label for="su-em">Email address</label><input type="email" id="su-em" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="field"><label for="su-em">Email address</label><input type="email" id="su-em" name="email" placeholder="you@example.com" autocomplete="email"/></div>
  
           <div class="field">
             <label for="su-pw">Password</label>
             <div class="pw-wrap">
-              <input type="password" id="su-pw" placeholder="At least 8 characters"/>
+              <input type="password" id="su-pw" name="password" placeholder="At least 8 characters" autocomplete="new-password"/>
               <button class="pw-toggle" onclick="togglePw('su-pw',this)" type="button" aria-label="Toggle password">
                 <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
           </div>
  
+          <div class="field">
+            <label for="su-pw-confirm">Confirm password</label>
+            <input type="password" id="su-pw-confirm" name="confirm_password" placeholder="Confirm password" autocomplete="new-password"/>
+          </div>
+
           <p class="err" id="s0-err">Please fill in all fields (password min. 8 characters).</p>
  
           <div class="divider">or</div>
@@ -162,7 +170,7 @@
             Sign up with Google
           </button>
  
-          <button class="btn-grad" onclick="goStep(1)">Continue →</button>
+          <button class="btn-grad" type="button" onclick="goStep(1)">Continue →</button>
           <p class="policy">By signing up you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
         </div>
  
@@ -194,8 +202,8 @@
           </div>
  
           <div class="step-nav">
-            <button class="btn-back" onclick="goStep(0)">← Back</button>
-            <button class="btn-grad btn-next" onclick="goStep(2)">Continue →</button>
+            <button class="btn-back" type="button" onclick="goStep(0)">← Back</button>
+            <button class="btn-grad btn-next" type="button" onclick="goStep(2)">Continue →</button>
           </div>
         </div>
  
@@ -212,10 +220,10 @@
                 <input type="number" id="contrib" min="0.50" step="0.50" value="0.50" class="field" style="padding-left:1.6rem;border-radius:11px;border:1.5px solid var(--border);background:rgba(255,255,255,.8);font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;width:100%;padding-top:.75rem;padding-bottom:.75rem;"/>
               </div>
               <div class="presets">
-                <button class="preset on" onclick="setPre(this,'0.50')">$0.50</button>
-                <button class="preset" onclick="setPre(this,'3')">$3</button>
-                <button class="preset" onclick="setPre(this,'5')">$5</button>
-                <button class="preset" onclick="setPre(this,'10')">$10</button>
+                <button class="preset on" type="button" onclick="setPre(this,'0.50')">$0.50</button>
+                <button class="preset" type="button" onclick="setPre(this,'3')">$3</button>
+                <button class="preset" type="button" onclick="setPre(this,'5')">$5</button>
+                <button class="preset" type="button" onclick="setPre(this,'10')">$10</button>
               </div>
             </div>
           </div>
@@ -224,8 +232,8 @@
           <p class="err" id="s2-err">Minimum is $0.50/month.</p>
  
           <div class="step-nav">
-            <button class="btn-back" onclick="goStep(1)">← Back</button>
-            <button class="btn-grad btn-next" onclick="handleSignup()">Create my account 🎉</button>
+            <button class="btn-back" type="button" onclick="goStep(1)">← Back</button>
+            <button class="btn-grad btn-next" type="button" onclick="handleSignup()">Create my account 🎉</button>
           </div>
         </div>
  
@@ -236,9 +244,10 @@
           </div>
           <p class="success-title">You're in! Welcome 🌿</p>
           <p class="success-sub">Your Workplace Passport is live. Head to your Daily Basecamp — jobs that truly fit are waiting.</p>
-          <button class="btn-grad" style="max-width:220px;margin:0 auto;" onclick="alert('→ Redirecting to your Basecamp…')">Go to my Basecamp →</button>
+          <button class="btn-grad" type="button" style="max-width:220px;margin:0 auto;" onclick="alert('→ Redirecting to your Basecamp…')">Go to my Basecamp →</button>
         </div>
  
+        </form>
       </div><!-- /panel-signup -->
  
     </div><!-- /card -->
