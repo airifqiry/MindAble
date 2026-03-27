@@ -1,11 +1,9 @@
 import json
-
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-
 from .models import WorkplaceProfile
 from .forms import RegisterForm, LoginForm
 
@@ -19,6 +17,7 @@ def register_view(request):
             user.save()
             login(request, user)
             return redirect('onboarding')
+        # If form invalid, fall through to render with errors
     else:
         form = RegisterForm()
     return render(request, 'mindable/signup.html', {
@@ -35,6 +34,7 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             return redirect('basecamp')
+        # If invalid, fall through to render with errors
     else:
         form = LoginForm()
     return render(request, 'mindable/signup.html', {
@@ -77,30 +77,27 @@ def basecamp(request):
 @login_required
 @require_POST
 def profile_upsert_api(request):
-    """
-    Single-page onboarding: save/update WorkplaceProfile from JSON payload.
-    """
     try:
         payload = json.loads(request.body.decode('utf-8') or '{}')
     except json.JSONDecodeError:
         return JsonResponse({'detail': 'Invalid JSON.'}, status=400)
 
-    skills = (payload.get('skills') or '').strip()
-    values = (payload.get('values') or '').strip()
-    neurotype = (payload.get('neurotype') or '').strip()
+    skills     = (payload.get('skills')        or '').strip()
+    values     = (payload.get('values')        or '').strip()
+    neurotype  = (payload.get('neurotype')     or '').strip()
     disadvantages = (payload.get('disadvantages') or '').strip()
-    enablers = (payload.get('enablers') or '').strip()
+    enablers   = (payload.get('enablers')      or '').strip()
 
     if not skills:
         return JsonResponse({'detail': 'Skills is required.'}, status=400)
 
-    experience_summary = "\n\n".join([part for part in [values, disadvantages] if part])
+    experience_summary = "\n\n".join([p for p in [values, disadvantages] if p])
 
-    profile, _created = WorkplaceProfile.objects.get_or_create(user=request.user)
-    profile.skills = skills
+    profile, created = WorkplaceProfile.objects.get_or_create(user=request.user)
+    profile.skills             = skills
     profile.experience_summary = experience_summary
-    profile.mental_disability = neurotype
-    profile.success_enablers = {'text': enablers} if enablers else {}
+    profile.mental_disability  = neurotype
+    profile.success_enablers   = {'text': enablers} if enablers else {}
     profile.save(update_fields=[
         'skills',
         'experience_summary',
@@ -110,8 +107,3 @@ def profile_upsert_api(request):
     ])
 
     return JsonResponse({'detail': 'Saved.', 'redirect_url': '/jobs/'}, status=200)
-
-
-@login_required
-def basecamp(request):
-    return render(request, 'mindable/dashboard.html')
