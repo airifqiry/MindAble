@@ -50,7 +50,9 @@ ROOT_URLCONF = 'mindable.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'mindable_app' / 'templates'],
+        # BASE_DIR = mindable/ (outer folder, where manage.py lives)
+        # settings.py is inside mindable/mindable/, so we go one level deeper
+        'DIRS': [BASE_DIR / 'mindable' / 'mindable_app' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -62,7 +64,7 @@ TEMPLATES = [
         },
     },
 ]
-
+ 
 WSGI_APPLICATION = 'mindable.wsgi.application'
 
 
@@ -139,7 +141,7 @@ USE_TZ = True
 
 # Static files
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / "static"] 
+STATICFILES_DIRS = [BASE_DIR / 'mindable' / 'mindable_app' / 'Static']
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
