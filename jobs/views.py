@@ -891,6 +891,25 @@ def _extract_bullets(block: str) -> list[str]:
     return lines
 
 
+def _sentences_from_paragraph(text: str, *, limit: int = 8) -> list[str]:
+    """Split accessible rewrite prose into short snippets for translated_tasks / lists."""
+    t = (text or "").strip()
+    if not t:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", t)
+    out: list[str] = []
+    for p in parts:
+        s = p.strip()
+        if len(s) < 12:
+            continue
+        out.append(s)
+        if len(out) >= limit:
+            break
+    if out:
+        return out
+    return [t[:280] + ("…" if len(t) > 280 else "")]
+
+
 def _build_toxicity_warnings(text: str) -> list[str]:
     lower = (text or "").lower()
     flags = []
@@ -908,26 +927,9 @@ def _build_toxicity_warnings(text: str) -> list[str]:
 def _rewrite_and_enrich_job(job: Job) -> str:
     from mindable.mindable_app.description_rewriter import rewrite_job_description
     rewritten = rewrite_job_description(job.original_description or "")
-    lower = rewritten.lower()
-
-    imp_start = lower.find("important things")
-    day_start = lower.find("a typical day")
-
-    important_block = ""
-    typical_day_block = ""
-    if imp_start >= 0 and day_start > imp_start:
-        important_block = rewritten[imp_start:day_start]
-        typical_day_block = rewritten[day_start:]
-    elif day_start >= 0:
-        typical_day_block = rewritten[day_start:]
-    else:
-        important_block = rewritten
-
-    important = _extract_bullets(important_block)
-    typical_day = _extract_bullets(typical_day_block)
-    merged_tasks = (important + typical_day)[:8]
-    if not merged_tasks:
-        merged_tasks = _extract_bullets(rewritten)[:8]
+    merged_tasks = _sentences_from_paragraph(rewritten, limit=8)
+    if len(merged_tasks) < 2:
+        merged_tasks = (_extract_bullets(rewritten) or merged_tasks)[:8]
 
     update_fields: list[str] = []
     if merged_tasks:

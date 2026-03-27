@@ -189,16 +189,19 @@ nav.scrolled { box-shadow: 0 4px 30px rgba(91,127,255,.1); }
   color: var(--muted); margin-bottom: .35rem;
 }
 .detail-text { font-size: .88rem; color: var(--text); line-height: 1.7; }
-.detail-pre {
-  white-space: pre-wrap;
+.detail-section--about-offer {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+.detail-about-offer {
   font-family: 'DM Sans', sans-serif;
   font-size: .88rem;
-  line-height: 1.65;
+  line-height: 1.75;
   color: var(--text);
-  background: rgba(255,255,255,.55);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: .7rem .8rem;
+  margin: 0;
+  max-width: 65ch;
 }
 .detail-list { list-style: none; display: flex; flex-direction: column; gap: .3rem; }
 .detail-list li { font-size: .88rem; color: var(--text); line-height: 1.6; display: flex; gap: .5rem; }

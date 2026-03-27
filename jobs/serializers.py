@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .logistics import logistics_highlights_for_job
 from .models import Job
 
 
@@ -141,8 +142,7 @@ class JobDetailSerializer(serializers.ModelSerializer):
     """
     Full serializer for the Job Detail / AI Translator page.
 
-    translated_tasks  → plain-language bullet list
-        e.g. ["Write weekly email updates", "Attend 1 meeting per week"]
+    translated_tasks  → retained for internal tools / chat context (not shown as “duties” in listings UI)
 
     toxicity_warnings → warning label strings
         e.g. ["Original post mentioned: 'must work under extreme pressure'"]
@@ -154,6 +154,7 @@ class JobDetailSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     display_title = serializers.SerializerMethodField()
     accessible_summary = serializers.SerializerMethodField()
+    work_logistics = serializers.SerializerMethodField()
 
     def get_display_title(self, obj):
         return obj.translated_title or obj.title
@@ -165,7 +166,10 @@ class JobDetailSerializer(serializers.ModelSerializer):
         tasks = obj.translated_tasks or []
         if not tasks:
             return ""
-        return "\n".join(f"- {t}" for t in tasks if t)
+        return " ".join(str(t).strip() for t in tasks if t)
+
+    def get_work_logistics(self, obj):
+        return logistics_highlights_for_job(obj)
 
     class Meta:
         model = Job
@@ -179,6 +183,7 @@ class JobDetailSerializer(serializers.ModelSerializer):
             'job_type',
             'external_url',
             'accessible_summary',
+            'work_logistics',
             'translated_tasks',
             'toxicity_warnings',
             'required_skills',

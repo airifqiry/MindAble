@@ -25,6 +25,13 @@ function safeText(value, fallback = '') {
   return v || fallback;
 }
 
+function escapeHtml(value) {
+  const s = String(value ?? '');
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 function updateCount() {
   const visible = [...document.querySelectorAll('.job-card')]
     .filter(c => !c.classList.contains('dismissed') && c.style.display !== 'none').length;
@@ -101,7 +108,7 @@ async function toggleExpand(card, viewBtn) {
         throw new Error(reason);
       }
       const data = await res.json();
-      const tasks = Array.isArray(data.translated_tasks) ? data.translated_tasks.filter(Boolean) : [];
+      const logistics = Array.isArray(data.work_logistics) ? data.work_logistics.filter(Boolean) : [];
       const warnings = Array.isArray(data.toxicity_warnings) ? data.toxicity_warnings.filter(Boolean) : [];
       const skills = Array.isArray(data.required_skills) ? data.required_skills.filter(Boolean) : [];
       const applyUrl = safeText(data.external_url, '#');
@@ -110,17 +117,16 @@ async function toggleExpand(card, viewBtn) {
       detail.innerHTML = `
         <div class="detail-divider"></div>
         ${warnings.length ? `<div class="toxicity-flag">${warnings[0]}</div>` : ''}
-        <div class="detail-section">
-          <div class="detail-label">Plain language overview</div>
-          <pre class="detail-pre">${accessibleSummary || 'Detailed rewrite is not available yet.'}</pre>
+        <div class="detail-section detail-section--about-offer">
+          <div class="detail-label">About this job offer</div>
+          <p class="detail-about-offer">${escapeHtml(accessibleSummary || 'Detailed rewrite is not available yet.')}</p>
         </div>
+        ${logistics.length ? `
         <div class="detail-section">
-          <div class="detail-label">What you would do</div>
-          ${tasks.length
-            ? `<ul class="detail-list">${tasks.slice(0, 5).map(t => `<li>${t}</li>`).join('')}</ul>`
-            : `<p class="detail-text">No detailed tasks yet. Open the role link for full info.</p>`
-          }
+          <div class="detail-label">Work setup and perks</div>
+          <ul class="detail-list">${logistics.slice(0, 10).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
         </div>
+        ` : ''}
         <div class="detail-section">
           <div class="detail-label">Skills mentioned</div>
           <p class="detail-text">${skills.length ? skills.slice(0, 8).join(', ') : 'Not provided'}</p>

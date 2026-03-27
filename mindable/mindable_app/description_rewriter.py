@@ -7,7 +7,6 @@ import re
 from typing import Final
 
 from dotenv import load_dotenv
-import anthropic
 
 from mindable.mindable_app.prompts import (
     DESCRIPTION_REWRITER_MODEL,
@@ -84,7 +83,6 @@ def _truncate_job_text_for_budget(job_text: str) -> str:
 
 
 def rewrite_job_description(job_text: str) -> str:
-    
     sanitized = _sanitize_for_prompt(job_text)
     truncated = _truncate_job_text_for_budget(sanitized)
 
@@ -101,4 +99,26 @@ def rewrite_job_description(job_text: str) -> str:
     if not out:
         raise ValueError("Job description rewriting produced an empty response.")
 
-    return out
+    return _normalize_rewriter_output(out)
+
+
+def _normalize_rewriter_output(text: str) -> str:
+    """
+    Collapse list-like lines into a single conversational paragraph for display.
+    Strips common bullet/number prefixes the model might still emit.
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return raw
+
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+    cleaned: list[str] = []
+    for ln in lines:
+        ln = re.sub(r"^[\-\*•]+\s*", "", ln)
+        ln = re.sub(r"^\d{1,2}[\.)]\s*", "", ln)
+        if ln:
+            cleaned.append(ln)
+
+    merged = " ".join(cleaned) if cleaned else raw
+    merged = re.sub(r"\s+", " ", merged).strip()
+    return merged
