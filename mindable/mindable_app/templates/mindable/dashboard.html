@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MindAble – Work that fits your mind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'mindable/dashboard.css' %}"/>
+</head>
+<body>
+
+<!-- Background blobs -->
+<div class="bg-auras">
+  <div class="aura aura-1"></div>
+  <div class="aura aura-2"></div>
+  <div class="aura aura-3"></div>
+  <div class="aura aura-4"></div>
+</div>
+
+<!-- NAV -->
+<nav id="navbar">
+  <button class="nav-menu-btn" id="nav-menu-btn" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <a href="#" class="nav-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    </div>
+    MindAble
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+  </div>
+</nav>
+
+<!-- NAV DROPDOWN PANEL -->
+<div id="nav-menu-panel" hidden>
+  <a href="./dashboard.html" data-page="home" class="nav-menu-link">Home</a>
+  <a href="./jobs.html" data-page="jobs" class="nav-menu-link">Job Listings</a>
+  <a href="./prep.html" data-page="prep" class="nav-menu-link">Interview Prep</a>
+  <a href="./dashboard.html#profile" data-page="profile" class="nav-menu-link">Profile</a>
+  <a href="#" data-page="logout" class="nav-menu-link" id="logout-action">Log out</a>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+
+  <h1 class="hero-headline">
+    Where your unique perspective<br/>meets its <span class="grad-text">perfect match</span>
+  </h1>
+
+  <p class="hero-sub">
+    MindAble matches neurodivergent professionals with roles built around
+    how they actually think — remote-first, async-friendly, and free of the
+    dealbreakers that drain you.
+  </p>
+
+  <div class="hero-actions">
+    <a href="job-board.html" class="btn-grad">Find my fit →</a>
+    <a href="#how" class="btn-ghost">See how it works</a>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section id="how">
+  <div class="section-header reveal">
+    <p class="section-eyebrow">How it works</p>
+    <h2 class="section-title">Three steps to a job that <span class="grad-text">actually works for you</span></h2>
+    <p class="section-sub">No lengthy interviews, no guesswork. Just a profile that protects your energy and a feed built around your needs.</p>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="section-header reveal">
+    <p class="section-eyebrow">Features</p>
+    <h2 class="section-title">Why MindAble <span class="grad-text">actually works</span></h2>
+    <p class="section-sub">Every feature exists to remove the barriers that standard job platforms put in front of neurodivergent professionals.</p>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <a href="#" class="footer-brand">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:white;fill:none;stroke-width:2;stroke-linecap:round"><path d="M12 2C8 2 4 5.5 4 10c0 3 1.5 5.5 4 7l4 5 4-5c2.5-1.5 4-4 4-7 0-4.5-4-8-8-8z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    </div>
+    MindAble
+  </a>
+  <div class="footer-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#">For employers</a>
+    <a href="#">Blog</a>
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+  </div>
+  <p class="footer-copy">© 2025 MindAble</p>
+</footer>
+
+<script src="{% static 'mindable/dashboard.js' %}"></script>
+</body>
+</html>
+

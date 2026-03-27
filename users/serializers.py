@@ -1,11 +1,11 @@
-from rest_framework import serializers
-from .models import User, WorkplaceProfile
 
-class WorkplaceProfileSerializer(serializers.ModelSerializer):
+from rest_framework import serializers
+from .models import User, WorkplaceProfile 
+
+class WorkplaceProfileSerializer(serializers.ModelSerializer): 
     class Meta:
         model = WorkplaceProfile
-        fields = ['resume_pdf', 'experience_summary', 'skills', 'success_enablers', 'dealbreakers', 'mental_disability', 'last_updated']
-        read_only_fields = ['last_updated']
+        fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
     profile = WorkplaceProfileSerializer(read_only=True)

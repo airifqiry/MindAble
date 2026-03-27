@@ -19,6 +19,8 @@ class WorkplaceProfile(models.Model):
     success_enablers = models.JSONField(default=dict, blank=True)
     dealbreakers = models.JSONField(default=list, blank=True)
     mental_disability = models.TextField(blank=True)
+    skills_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
+    needs_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
