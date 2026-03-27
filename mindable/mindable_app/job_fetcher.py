@@ -13,12 +13,16 @@ _ARBEITNOW_URL = "https://www.arbeitnow.com/api/job-board-api"
 
 
 def _fetch_url(url: str) -> dict:
-    with urllib.request.urlopen(url, timeout=10) as response:
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'Mozilla/5.0 (compatible; Mindable/1.0)'}
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read())
 
 
 def _fetch_himalayas(skills: list[str], limit: int = 20) -> list[dict]:
-    query = "+".join(skills[:3])
+    query = " ".join(skills[:3])
     url = f"{_HIMALAYAS_SEARCH_URL}?q={urllib.parse.quote(query)}&limit={limit}"
     try:
         data = _fetch_url(url)
@@ -48,14 +52,10 @@ def _fetch_arbeitnow(skills: list[str], page: int = 1) -> list[dict]:
         data = _fetch_url(url)
         skill_keywords = [s.lower() for s in skills]
         jobs = []
-        for job in data.get('data', []):
-            title = job.get('title', '').lower()
-            description = job.get('description', '').lower()
-            tags = [t.lower() for t in job.get('tags', [])]
-            combined = title + description + " ".join(tags)
-            if not any(skill in combined for skill in skill_keywords):
-                continue
-            jobs.append({
+        fallback_jobs = []
+
+        def _to_job_payload(job: dict[str, Any]) -> dict[str, Any]:
+            return {
                 'title':          job.get('title', ''),
                 'company':        job.get('company_name', ''),
                 'location':       job.get('location', ''),
@@ -65,7 +65,22 @@ def _fetch_arbeitnow(skills: list[str], page: int = 1) -> list[dict]:
                 'required_skills': job.get('tags', []),
                 'is_remote':      job.get('remote', False),
                 'source':         'arbeitnow',
-            })
+            }
+
+        for job in data.get('data', []):
+            title = job.get('title', '').lower()
+            description = job.get('description', '').lower()
+            tags = [t.lower() for t in job.get('tags', [])]
+            combined = title + description + " ".join(tags)
+            payload = _to_job_payload(job)
+            fallback_jobs.append(payload)
+            if skill_keywords and not any(skill in combined for skill in skill_keywords):
+                continue
+            jobs.append(payload)
+
+        # Graceful fallback: if keyword matching found nothing, still return fresh jobs.
+        if not jobs and fallback_jobs:
+            jobs = fallback_jobs[:20]
         logger.info("Fetched %d matching jobs from Arbeitnow.", len(jobs))
         return jobs
     except Exception as exc:
@@ -133,6 +148,16 @@ def fetch_and_save_jobs(
 ) -> int:
     from jobs.models import Job, Company
 
+    def _normalize_job_type(raw_type: str) -> str:
+        value = (raw_type or "").strip().lower().replace("_", "-")
+        if "part" in value:
+            return "part-time"
+        if "hybrid" in value:
+            return "hybrid"
+        if "remote" in value:
+            return "remote"
+        return "full-time"
+
     jobs_data = fetch_jobs(
         skills=skills,
         include_remote=include_remote,
@@ -153,10 +178,12 @@ def fetch_and_save_jobs(
                     'company':              company,
                     'title':                job_data.get('title', ''),
                     'location':             str(job_data.get('location') or 'Remote'),
-                    'job_type':             job_data.get('job_type', 'Full Time')[:20],
+                    'job_type':             _normalize_job_type(job_data.get('job_type', '')),
                     'original_description': job_data.get('description', ''),
                     'required_skills':      job_data.get('required_skills', []),
-                    'is_translated':        False,
+                    # Fallback so jobs appear in the feed even before AI translation runs.
+                    'translated_title':     job_data.get('title', ''),
+                    'is_translated':        True,
                 }
             )
             if created:
