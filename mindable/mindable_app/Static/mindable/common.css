@@ -116,6 +116,17 @@ html {
   outline-offset: 2px;
 }
 
+/* Menu: the global ring on the first item looked like “Home is the current page” */
+#nav-wrapper .nav-menu-trigger:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.45);
+  outline-offset: 2px;
+}
+
+#nav-menu-panel .nav-menu-link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.35);
+}
+
 /* ── Scroll reveal ── */
 .reveal {
   opacity: 0;
