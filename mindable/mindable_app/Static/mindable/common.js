@@ -4,19 +4,29 @@ function setupNavDropdown() {
   const panel = document.getElementById('nav-menu-panel');
   if (!wrapper || !trigger || !panel) return;
 
-  const activePage = document.body.dataset.activePage || '';
+  const activePage = (document.body.getAttribute('data-active-page') || '').trim();
 
   const links = panel.querySelectorAll('a[data-page]');
-  links.forEach(link => {
-    link.classList.toggle('is-active', link.dataset.page === activePage);
-  });
+
+  function getCurrentPageLink() {
+    if (!activePage) return null;
+    try {
+      return panel.querySelector(`a.nav-menu-link[data-page="${CSS.escape(activePage)}"]`);
+    } catch (e) {
+      return panel.querySelector(`a.nav-menu-link[data-page="${activePage}"]`);
+    }
+  }
 
   function setOpen(isOpen) {
     panel.hidden = !isOpen;
     trigger.setAttribute('aria-expanded', String(isOpen));
     if (isOpen) {
-      const first = panel.querySelector('a');
-      if (first) first.focus({ preventScroll: true });
+      const activeLink = getCurrentPageLink();
+      if (activeLink) {
+        activeLink.focus({ preventScroll: true });
+      } else {
+        trigger.focus({ preventScroll: true });
+      }
     }
   }
 

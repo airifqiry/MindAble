@@ -300,11 +300,10 @@ input[type=range]::-webkit-slider-thumb {
 .success-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text); }
 .success-sub { font-size: .88rem; color: var(--muted); line-height: 1.6; max-width: 290px; }
  
-/* responsive */
+/* responsive — signup layout only (prep also loads this file; do not target global nav) */
 @media (max-width: 900px) {
   .page { grid-template-columns: 1fr; }
   .left { display: none; }
   .right { padding: 2rem 1.2rem; }
-  nav { padding: 0 1.5rem; }
-  .nav-links { display: none; }
+  .signup-nav-only { padding: 0 1.5rem; }
 }

@@ -116,6 +116,19 @@ html {
   outline-offset: 2px;
 }
 
+/* Menu: the global ring on the first item looked like “Home is the current page” */
+#nav-wrapper .nav-menu-trigger:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.45);
+  outline-offset: 2px;
+}
+
+/* No focus ring on menu links — any ring read as “selected”; keyboard users still have hover */
+#nav-menu-panel .nav-menu-link:focus,
+#nav-menu-panel .nav-menu-link:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* ── Scroll reveal ── */
 .reveal {
   opacity: 0;
@@ -162,13 +175,30 @@ html {
   color: var(--text);
 }
 
+/* Hover (non-current links stay readable; current route uses higher-specificity rules below) */
 #nav-menu-panel .nav-menu-link:hover {
-  border-color: var(--purple);
-  background: var(--glass-bg);
+  border-color: transparent;
+  background: rgba(139, 92, 246, 0.07);
 }
 
-/* Active page: purple gradient text */
-#nav-menu-panel .nav-menu-link.is-active {
+/*
+ * Current page highlight — driven only by body[data-active-page] + a[data-page].
+ * This cannot highlight “Home” while you are on chatbot (unlike a stray .is-active class).
+ */
+body[data-active-page='home'] #nav-menu-panel a[data-page='home'],
+body[data-active-page='jobs'] #nav-menu-panel a[data-page='jobs'],
+body[data-active-page='chatbot'] #nav-menu-panel a[data-page='chatbot'] {
+  border-color: var(--purple);
+  background: var(--glass-bg);
+  background-image: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body[data-active-page='home'] #nav-menu-panel a[data-page='home']:hover,
+body[data-active-page='jobs'] #nav-menu-panel a[data-page='jobs']:hover,
+body[data-active-page='chatbot'] #nav-menu-panel a[data-page='chatbot']:hover {
   border-color: var(--purple);
   background: var(--glass-bg);
   background-image: var(--grad);
