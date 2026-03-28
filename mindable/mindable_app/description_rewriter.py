@@ -103,10 +103,6 @@ def rewrite_job_description(job_text: str) -> str:
 
 
 def _normalize_rewriter_output(text: str) -> str:
-    """
-    Collapse list-like lines into a single conversational paragraph for display.
-    Strips common bullet/number prefixes the model might still emit.
-    """
     raw = (text or "").strip()
     if not raw:
         return raw
