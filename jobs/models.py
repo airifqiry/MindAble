@@ -38,6 +38,7 @@ class Job(models.Model):
 
     skills_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     needs_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
+    embedding_version = models.CharField(max_length=64, blank=True, default="")
     is_translated = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

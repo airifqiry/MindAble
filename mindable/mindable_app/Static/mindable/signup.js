@@ -16,20 +16,20 @@ function togglePw(id, btn) {
     : `<svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
-// ── Signup submit ──
-function handleSignup() {
+// ── Signup: native submit + client validation (server also maps email → username) ──
+function validateSignupSubmit(e) {
   const fn = document.getElementById('su-fn').value.trim();
   const ln = document.getElementById('su-ln').value.trim();
   const em = document.getElementById('su-em').value.trim();
   const pw = document.getElementById('su-pw').value;
   const pw2 = document.getElementById('su-pw-confirm').value;
   const err = document.getElementById('s0-err');
-  if (!fn||!ln||!em||pw.length<8||pw !== pw2) { err.classList.add('on'); return; }
+  document.getElementById('su-username').value = em;
+  if (!fn || !ln || !em || pw.length < 8 || pw !== pw2) {
+    err.classList.add('on');
+    e.preventDefault();
+    return false;
+  }
   err.classList.remove('on');
-
-  const email = document.getElementById('su-em').value.trim();
-  document.getElementById('su-username').value = email;
-
-  const form = document.getElementById('signup-form');
-  if (form) form.submit();
+  return true;
 }

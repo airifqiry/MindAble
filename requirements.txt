@@ -10,6 +10,8 @@ sqlparse==0.5.3
 tzdata==2025.1
 anthropic>=0.40.0
 pydantic>=2.0
+sentence-transformers>=3.0.0
+torch>=2.0.0
 pytest>=8.0
 pytest-mock>=3.0
 django-cors-headers==4.3.1

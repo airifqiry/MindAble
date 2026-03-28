@@ -74,6 +74,12 @@
   stroke-linecap: round;
 }
 
+/* SVG shapes default to fill=black in some browsers if only the root <svg> has fill:none */
+#nav-wrapper .nav-logo svg circle,
+#nav-wrapper .nav-logo svg path {
+  fill: none;
+}
+
 #nav-wrapper .nav-links {
   display: flex;
   align-items: center;

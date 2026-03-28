@@ -306,7 +306,7 @@ def fetch_and_save_jobs(
     include_onsite: bool = True,
 ) -> int:
     from jobs.models import Job, Company
-    from mindable.mindable_app.embedding_service import build_job_embeddings
+    from mindable.mindable_app.embedding_service import build_job_embeddings, get_embedding_version
 
     def _normalize_job_type(raw_type: str) -> str:
         value = (raw_type or "").strip().lower().replace("_", "-")
@@ -340,9 +340,11 @@ def fetch_and_save_jobs(
             ).strip()
             skills_embedding = None
             needs_embedding = None
+            emb_ver = ""
             if job_skills_text and job_needs_text:
                 try:
                     skills_embedding, needs_embedding = build_job_embeddings(job_skills_text, job_needs_text)
+                    emb_ver = get_embedding_version()
                 except Exception as exc:
                     logger.warning("Job embedding build failed for %s: %s", job_data.get('title', ''), exc)
 
@@ -357,6 +359,7 @@ def fetch_and_save_jobs(
                     'required_skills':      job_data.get('required_skills', []),
                     'skills_embedding':     skills_embedding,
                     'needs_embedding':      needs_embedding,
+                    'embedding_version':    emb_ver,
                     # Fallback so jobs appear in the feed even before AI translation runs.
                     'translated_title':     job_data.get('title', ''),
                     'is_translated':        True,
