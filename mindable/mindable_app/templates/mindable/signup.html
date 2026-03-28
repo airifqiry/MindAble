@@ -73,12 +73,12 @@
  
       <!-- Tabs -->
       <div class="tabs" role="tablist">
-        <button class="tab active" id="tab-login" onclick="switchTab('login')">Log In</button>
-        <button class="tab" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+        <button type="button" class="tab {% if active_tab != 'register' %}active{% endif %}" id="tab-login" onclick="switchTab('login')">Log In</button>
+        <button type="button" class="tab {% if active_tab == 'register' %}active{% endif %}" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
       </div>
  
       <!-- ══ LOGIN ══ -->
-      <div class="form-panel visible" id="panel-login">
+      <div class="form-panel {% if active_tab != 'register' %}visible{% endif %}" id="panel-login">
         <p class="form-title">Welcome back 👋</p>
         <p class="form-sub">No rush. Take your time.</p>
  
@@ -106,26 +106,36 @@
       </div>
  
       <!-- ══ SIGN UP ══ -->
-      <div class="form-panel" id="panel-signup">
-        <form id="signup-form" method="POST" action="{% url 'register' %}">
+      <div class="form-panel {% if active_tab == 'register' %}visible{% endif %}" id="panel-signup">
+        <form id="signup-form" method="POST" action="{% url 'register' %}" novalidate onsubmit="return validateSignupSubmit(event)">
           {% csrf_token %}
           <input type="hidden" id="su-username" name="username" value=""/>
  
         <div class="signup-step active" id="s0">
           <p class="form-title">Create your account</p>
           <p class="form-sub">A safe space, built just for you.</p>
+
+          {% if register_form.non_field_errors %}
+            <p class="err on server-err">{{ register_form.non_field_errors.0 }}</p>
+          {% endif %}
+          {% if register_form.errors and not register_form.non_field_errors %}
+            <p class="err on server-err">Please fix the errors below and try again.</p>
+          {% endif %}
  
           <div class="field-row">
-            <div class="field"><label for="su-fn">First name</label><input type="text" id="su-fn" placeholder="Alex" autocomplete="given-name"/></div>
-            <div class="field"><label for="su-ln">Last name</label><input type="text" id="su-ln" placeholder="Jordan" autocomplete="family-name"/></div>
+            <div class="field"><label for="su-fn">First name</label><input type="text" id="su-fn" name="first_name" value="{{ register_form.first_name.value|default:'' }}" placeholder="Alex" autocomplete="given-name"/></div>
+            <div class="field"><label for="su-ln">Last name</label><input type="text" id="su-ln" name="last_name" value="{{ register_form.last_name.value|default:'' }}" placeholder="Jordan" autocomplete="family-name"/></div>
           </div>
+          {% if register_form.first_name.errors %}<p class="err on">{{ register_form.first_name.errors.0 }}</p>{% endif %}
+          {% if register_form.last_name.errors %}<p class="err on">{{ register_form.last_name.errors.0 }}</p>{% endif %}
  
-          <div class="field"><label for="su-em">Email address</label><input type="email" id="su-em" name="email" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="field"><label for="su-em">Email address</label><input type="email" id="su-em" name="email" value="{{ register_form.email.value|default:'' }}" placeholder="you@example.com" autocomplete="email" required/></div>
+          {% if register_form.email.errors %}<p class="err on">{{ register_form.email.errors.0 }}</p>{% endif %}
  
           <div class="field">
             <label for="su-pw">Password</label>
             <div class="pw-wrap">
-              <input type="password" id="su-pw" name="password" placeholder="At least 8 characters" autocomplete="new-password"/>
+              <input type="password" id="su-pw" name="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required/>
               <button class="pw-toggle" onclick="togglePw('su-pw',this)" type="button" aria-label="Toggle password">
                 <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
@@ -134,12 +144,14 @@
  
           <div class="field">
             <label for="su-pw-confirm">Confirm password</label>
-            <input type="password" id="su-pw-confirm" name="confirm_password" placeholder="Confirm password" autocomplete="new-password"/>
+            <input type="password" id="su-pw-confirm" name="confirm_password" placeholder="Confirm password" autocomplete="new-password" minlength="8" required/>
           </div>
+          {% if register_form.password.errors %}<p class="err on">{{ register_form.password.errors.0 }}</p>{% endif %}
+          {% if register_form.confirm_password.errors %}<p class="err on">{{ register_form.confirm_password.errors.0 }}</p>{% endif %}
 
           <p class="err" id="s0-err">Please fill in all fields (password min. 8 characters).</p>
  
-          <button class="btn-grad" type="button" onclick="handleSignup()">Create my account 🎉</button>
+          <button class="btn-grad" type="submit">Create my account 🎉</button>
         </div>
  
         </form>
@@ -149,6 +161,6 @@
   </div><!-- /right -->
  
 </div><!-- /page -->
-<script src="{% static 'signup.js' %}"></script>
+<script src="{% static 'signup.js' %}?v=2"></script>
 </body>
 </html>

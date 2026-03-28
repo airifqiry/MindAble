@@ -74,6 +74,12 @@
   stroke-linecap: round;
 }
 
+/* SVG shapes default to fill=black in some browsers if only the root <svg> has fill:none */
+#nav-wrapper .nav-logo svg circle,
+#nav-wrapper .nav-logo svg path {
+  fill: none;
+}
+
 #nav-wrapper .nav-links {
   display: flex;
   align-items: center;
@@ -108,6 +114,17 @@ html {
 :focus-visible {
   outline: 3px solid var(--purple);
   outline-offset: 2px;
+}
+
+/* Menu: the global ring on the first item looked like “Home is the current page” */
+#nav-wrapper .nav-menu-trigger:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.45);
+  outline-offset: 2px;
+}
+
+#nav-menu-panel .nav-menu-link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.35);
 }
 
 /* ── Scroll reveal ── */

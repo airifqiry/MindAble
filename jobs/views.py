@@ -389,9 +389,8 @@ def _fuse_embedding_with_lexical(
     lexical_skill_fit: float,
 ) -> tuple[float, float]:
     """
-    Hash / bag-style embeddings often sit in a modest cosine band and understate obvious
-    keyword overlap. Fuse lexical agreement into the embedding channel so scores track
-    visible skill fit; ranking stays driven by the same signals, but % is better calibrated.
+    Sentence-transformer cosine can still understate obvious keyword overlap vs. sparse text.
+    Fuse lexical agreement into the embedding channel so scores track visible skill fit.
     """
     e_sk = _cosine_to_unit_interval(raw_skills_cos)
     e_nd = _cosine_to_unit_interval(raw_needs_cos)
@@ -540,7 +539,7 @@ def _apply_embedding_ranking(
                 elif tech_ratio < 0.10 and title_tech_ratio < 0.10:
                     positive *= 0.82
             else:
-                # MODE B: general skills + fused embedding (hash embeddings get lexical lift here too).
+                # MODE B: general skills + fused embedding.
                 title_fit = min(1.0, title_hits / 4.0)
 
                 signal_count = sum(
@@ -668,14 +667,16 @@ def _apply_embedding_ranking(
 
 
 def _ensure_user_embeddings(passport: WorkplaceProfile) -> WorkplaceProfile:
+    from mindable.mindable_app.embedding_service import build_user_embeddings, get_embedding_version
+
     current_enablers = passport.success_enablers if isinstance(passport.success_enablers, dict) else {}
     has_analyzed = isinstance(current_enablers.get("analyzed_profile"), dict)
     has_embeddings = bool(passport.skills_embedding and passport.needs_embedding)
-    if has_embeddings and has_analyzed:
+    current_ver = get_embedding_version()
+    if has_embeddings and has_analyzed and getattr(passport, "embedding_version", "") == current_ver:
         return passport
 
     from mindable.mindable_app.profile_analyzer import analyze_profile
-    from mindable.mindable_app.embedding_service import build_user_embeddings
 
     profile_text = " ".join(filter(None, [
         passport.skills or "",
@@ -686,21 +687,28 @@ def _ensure_user_embeddings(passport: WorkplaceProfile) -> WorkplaceProfile:
     if not profile_text:
         return passport
 
-    analyzed = analyze_profile(profile_text)
-    if not has_embeddings:
-        skills_emb, needs_emb = build_user_embeddings(analyzed)
-        passport.skills_embedding = skills_emb
-        passport.needs_embedding = needs_emb
-    current_enablers["analyzed_profile"] = analyzed
-    passport.success_enablers = current_enablers
-    passport.dealbreakers = analyzed.get("limitations") or passport.dealbreakers
-    passport.save(update_fields=[
+    if has_analyzed:
+        analyzed = current_enablers["analyzed_profile"]
+    else:
+        analyzed = analyze_profile(profile_text)
+        current_enablers["analyzed_profile"] = analyzed
+        passport.success_enablers = current_enablers
+        passport.dealbreakers = analyzed.get("limitations") or passport.dealbreakers
+
+    skills_emb, needs_emb = build_user_embeddings(analyzed)
+    passport.skills_embedding = skills_emb
+    passport.needs_embedding = needs_emb
+    passport.embedding_version = current_ver
+
+    update_fields = [
         "skills_embedding",
         "needs_embedding",
-        "success_enablers",
-        "dealbreakers",
+        "embedding_version",
         "last_updated",
-    ])
+    ]
+    if not has_analyzed:
+        update_fields.extend(["success_enablers", "dealbreakers"])
+    passport.save(update_fields=update_fields)
     return passport
 
 
@@ -858,10 +866,17 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
 
 
 def _ensure_job_embeddings(qs) -> None:
-    from mindable.mindable_app.embedding_service import build_job_embeddings
+    from mindable.mindable_app.embedding_service import build_job_embeddings, get_embedding_version
 
-    # Backfill more jobs so personalization has enough candidates.
-    missing = list(qs.filter(Q(skills_embedding__isnull=True) | Q(needs_embedding__isnull=True))[:150])
+    ver = get_embedding_version()
+    # Backfill or refresh when embeddings missing or model version changed (legacy hash → ST).
+    missing = list(
+        qs.filter(
+            Q(skills_embedding__isnull=True)
+            | Q(needs_embedding__isnull=True)
+            | ~Q(embedding_version=ver)
+        )[:150]
+    )
     for job in missing:
         skills_text = " ".join(
             [job.title or "", " ".join(job.required_skills or [])]
@@ -875,7 +890,8 @@ def _ensure_job_embeddings(qs) -> None:
             skills_emb, needs_emb = build_job_embeddings(skills_text, needs_text)
             job.skills_embedding = skills_emb
             job.needs_embedding = needs_emb
-            job.save(update_fields=["skills_embedding", "needs_embedding"])
+            job.embedding_version = ver
+            job.save(update_fields=["skills_embedding", "needs_embedding", "embedding_version"])
         except Exception as exc:
             logger.warning("Failed to backfill embeddings for job %s: %s", job.id, exc)
 

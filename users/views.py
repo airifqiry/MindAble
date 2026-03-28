@@ -10,11 +10,14 @@ from .forms import RegisterForm, LoginForm
 
 def register_view(request):
     if request.method == 'POST':
-        form = RegisterForm(request.POST)
+        post = request.POST.copy()
+        # JS may not run; align with login (email as username).
+        email = (post.get("email") or "").strip()
+        if email and not (post.get("username") or "").strip():
+            post["username"] = email
+        form = RegisterForm(post)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.set_password(form.cleaned_data['password'])
-            user.save()
+            user = form.save()
             login(request, user)
             return redirect('onboarding')
     else:
@@ -106,12 +109,13 @@ def profile_upsert_api(request):
 
     try:
         from mindable.mindable_app.profile_analyzer import analyze_profile
-        from mindable.mindable_app.embedding_service import build_user_embeddings
+        from mindable.mindable_app.embedding_service import build_user_embeddings, get_embedding_version
 
         analyzed = analyze_profile(profile_text)
         skills_emb, needs_emb = build_user_embeddings(analyzed)
         profile.skills_embedding = skills_emb
         profile.needs_embedding = needs_emb
+        profile.embedding_version = get_embedding_version()
         # Persist structured analysis so ranking can use all profile signals.
         profile.success_enablers = {
             'text': enablers,
@@ -132,6 +136,7 @@ def profile_upsert_api(request):
         'dealbreakers',
         'skills_embedding',
         'needs_embedding',
+        'embedding_version',
         'last_updated',
     ])
 

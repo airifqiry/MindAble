@@ -21,6 +21,7 @@ class WorkplaceProfile(models.Model):
     mental_disability = models.TextField(blank=True)
     skills_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
     needs_embedding = ArrayField(models.FloatField(), size=384, null=True, blank=True)
+    embedding_version = models.CharField(max_length=64, blank=True, default="")
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):

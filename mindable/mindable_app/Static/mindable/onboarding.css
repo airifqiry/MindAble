@@ -69,6 +69,12 @@ h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;-web
 .step-card-head{display:flex;align-items:center;gap:.9rem;padding:1.3rem 1.7rem;border-bottom:1px solid rgba(139,92,246,.06);}
 .step-icon{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;}
 .step-icon svg{width:19px;height:19px;stroke:white;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.step-icon svg circle,
+.step-icon svg path,
+.step-icon svg line,
+.step-icon svg polyline{
+  fill:none;
+}
 .si-1{background:linear-gradient(135deg,#5B7FFF,#8B5CF6);}
 .si-15{background:linear-gradient(135deg,#EC4899,#f97316);}
 .si-2{background:linear-gradient(135deg,#10B981,#22d3ee);}
@@ -114,4 +120,13 @@ h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;-web
   .step-card-body{padding:1.2rem 1.2rem;}
   .submit-card{flex-direction:column;}
   .btn-launch{width:100%;justify-content:center;}
+}
+
+/* Onboarding extends base.html + common.css; reinforce menu chrome if UA link styles leak */
+#nav-menu-panel .nav-menu-link {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  text-decoration: none;
 }
