@@ -44,7 +44,7 @@ function readStoredJobId() {
       return parseInt(raw.trim(), 10);
     }
   } catch (_) {
-    /* ignore */
+    
   }
   return null;
 }
@@ -55,7 +55,7 @@ function writeStoredJobId(id) {
       sessionStorage.setItem(PREP_JOB_STORAGE_KEY, String(id));
     }
   } catch (_) {
-    /* ignore */
+    
   }
 }
 

@@ -1,4 +1,4 @@
-// ── Tab switch ──
+
 function switchTab(t) {
   ['login','signup'].forEach(id => {
     document.getElementById('panel-'+id).classList.toggle('visible', id===t);
@@ -6,7 +6,7 @@ function switchTab(t) {
   });
 }
  
-// ── Password toggle ──
+
 function togglePw(id, btn) {
   const inp = document.getElementById(id);
   const show = inp.type==='password';
@@ -16,7 +16,7 @@ function togglePw(id, btn) {
     : `<svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
-// ── Signup: native submit + client validation (server also maps email → username) ──
+
 function validateSignupSubmit(e) {
   const fn = document.getElementById('su-fn').value.trim();
   const ln = document.getElementById('su-ln').value.trim();

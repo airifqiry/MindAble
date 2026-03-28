@@ -1,14 +1,14 @@
 const fields  = ['f-skills','f-values','f-neurotype','f-disadvantages','f-enablers'];
 const pillIds = ['sp1','sp15','sp2','sp3','sp4'];
 const cardIds = ['card1','card15','card2','card3','card4'];
-const NAV_H   = 68 + 58; // nav + sticky progress strip
+const NAV_H   = 68 + 58; 
  
 function jumpTo(i){
   const card = document.getElementById(cardIds[i]);
   const top  = card.getBoundingClientRect().top + window.scrollY - NAV_H - 16;
   window.scrollTo({top, behavior:'smooth'});
  
-  // flash the card border after scroll lands
+  
   setTimeout(()=>{
     card.classList.add('flash');
     const ta = card.querySelector('textarea');
@@ -30,7 +30,7 @@ function updateProgress(){
   if(firstEmpty > -1) document.getElementById(pillIds[firstEmpty]).classList.add('active');
 }
  
-// update active pill as user scrolls
+
 const io = new IntersectionObserver(entries=>{
   entries.forEach(e=>{
     if(e.isIntersecting){
@@ -66,7 +66,7 @@ function submitProfile(){
     return;
   }
 
-  // Read optional fields (they can be empty).
+  
   const payload = {
     skills: skills,
     values: valuesEl ? valuesEl.value.trim() : '',
@@ -98,7 +98,7 @@ function submitProfile(){
       const detail = data && data.detail ? data.detail : 'Unknown error';
       throw new Error(`Save failed (${res.status}): ${detail}`);
     }
-    // User instruction: redirect to /jobs/ after POST.
+    
     window.location.href = '/jobs/';
   }).catch((err) => {
     console.error(err);

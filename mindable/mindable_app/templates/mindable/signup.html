@@ -12,7 +12,7 @@
 </head>
 <body>
  
-<!-- Background auras -->
+
 <div class="bg">
   <div class="aura aura-1"></div>
   <div class="aura aura-2"></div>
@@ -28,10 +28,10 @@
   </a>
 </nav>
  
-<!-- Page -->
+
 <div class="page">
  
-  <!-- LEFT -->
+  
   <div class="left">
     <div class="badge"><span class="badge-dot"></span> AI-Powered Job Matching</div>
  
@@ -67,17 +67,17 @@
     </div>
   </div>
  
-  <!-- RIGHT -->
+  
   <div class="right">
     <div class="card">
  
-      <!-- Tabs -->
+      
       <div class="tabs" role="tablist">
         <button type="button" class="tab {% if active_tab != 'register' %}active{% endif %}" id="tab-login" onclick="switchTab('login')">Log In</button>
         <button type="button" class="tab {% if active_tab == 'register' %}active{% endif %}" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
       </div>
  
-      <!-- ══ LOGIN ══ -->
+      
       <div class="form-panel {% if active_tab != 'register' %}visible{% endif %}" id="panel-login">
         <p class="form-title">Welcome back 👋</p>
         <p class="form-sub">No rush. Take your time.</p>
@@ -105,7 +105,7 @@
         </form>
       </div>
  
-      <!-- ══ SIGN UP ══ -->
+      
       <div class="form-panel {% if active_tab == 'register' %}visible{% endif %}" id="panel-signup">
         <form id="signup-form" method="POST" action="{% url 'register' %}" novalidate onsubmit="return validateSignupSubmit(event)">
           {% csrf_token %}
@@ -155,12 +155,12 @@
         </div>
  
         </form>
-      </div><!-- /panel-signup -->
+      </div>
  
-    </div><!-- /card -->
-  </div><!-- /right -->
+    </div>
+  </div>
  
-</div><!-- /page -->
+</div>
 <script src="{% static 'signup.js' %}?v=2"></script>
 </body>
 </html>

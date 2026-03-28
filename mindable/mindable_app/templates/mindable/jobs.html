@@ -7,14 +7,14 @@
 {% endblock %}
 {% block content %}
 
-<!-- ── Aura background ── -->
+
 <div class="bg-auras">
   <div class="aura aura-1"></div>
   <div class="aura aura-2"></div>
   <div class="aura aura-3"></div>
 </div>
 
-<!-- ── PAGE ── -->
+
 <main class="page">
 
   <div class="page-header">
@@ -25,18 +25,18 @@
 
   <p class="results-count"><span id="results-num">0</span> roles matched your profile</p>
 
-  <!-- ── JOB FEED ── -->
+  
   <div class="job-feed" id="job-feed">
-  </div><!-- /job-feed -->
+  </div>
 
-  <!-- Empty state -->
+  
   <div class="empty-state" id="empty-state" hidden>
     <div class="empty-icon">🌿</div>
     <p class="empty-h">No roles available right now</p>
     <p class="empty-p">Try again later or update your profile skills for broader matching.</p>
   </div>
 
-  <!-- Load more -->
+  
   <div class="load-more-wrap" id="load-more-wrap" hidden>
     <button class="btn-load-more" onclick="loadMore()">Load more roles</button>
   </div>
