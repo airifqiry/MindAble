@@ -21,16 +21,11 @@ from mindable.mindable_app.skill_classifier import split_technical_general
 
 logger = logging.getLogger(__name__)
 
-# Suitability tiers (for labeling only — not hard API cutoffs).
 _STRONG_TIER_MIN = 0.52
 _MODERATE_TIER_MIN = 0.40
-# Max fractional dampening from penalties: final = positive * (1 - min(MAX, total_penalty)).
-# Subtractive penalty + long skill lists was compressing almost everything below ~40%.
 _MAX_TOTAL_PENALTY = 0.34
-# Secondary floor used only inside progressive fallback (never a single global gate).
 _FALLBACK_RELAXED_FLOOR = 0.25
 
-# API "fit %" is a calibrated display derived from raw model scores (rank is unchanged).
 _DISPLAY_FIT_LOW = 0.52
 _DISPLAY_FIT_HIGH = 0.93
 
@@ -40,10 +35,6 @@ def _calibrated_display_fit(
     smin: float | None,
     smax: float | None,
 ) -> float:
-    """
-    Map compressed internal scores into a user-facing [low, high] band using cohort
-    min/max so the best jobs in the pool read as a strong match while preserving order.
-    """
     raw = max(0.0, min(1.0, float(raw)))
     if smin is None or smax is None:
         return min(
@@ -64,7 +55,6 @@ def _calibrated_display_fit(
 
 
 def _suitability_tier_display(display_fit: float) -> str:
-    """Labels aligned to calibrated fit % (not raw model score)."""
     if display_fit >= 0.84:
         return "strong"
     if display_fit >= 0.68:
@@ -73,7 +63,6 @@ def _suitability_tier_display(display_fit: float) -> str:
 
 
 def _match_quality_display(display_fit: float) -> str:
-    """Card quality label consistent with calibrated match_score."""
     if display_fit >= 0.86:
         return "high"
     if display_fit <= 0.62:
@@ -82,7 +71,6 @@ def _match_quality_display(display_fit: float) -> str:
 
 
 def _natural_job_key(job: Job) -> str:
-    """Stable key for deduplication across duplicate DB rows (same listing, different ids)."""
     company_name = ""
     try:
         company_name = (job.company.name or "").strip().lower()
@@ -99,10 +87,6 @@ def _natural_job_key(job: Job) -> str:
 
 
 def _dedupe_jobs_keep_best_score(jobs: list[Job], score_map: dict[int, float]) -> tuple[list[Job], int]:
-    """
-    One row per natural key; keep the instance with the highest score.
-    Returns (deduped list sorted by score desc, number of rows dropped).
-    """
     before = len(jobs)
     best: dict[str, Job] = {}
     best_score: dict[str, float] = {}
@@ -122,7 +106,6 @@ def _filter_by_min_score(
     score_map: dict[int, float],
     min_score: float,
 ) -> list[Job]:
-    """Keep jobs whose score is at or above min_score; skip rows without scores."""
     kept: list[Job] = []
     for job in jobs:
         if job.id not in score_map:
@@ -133,10 +116,6 @@ def _filter_by_min_score(
 
 
 def _percentile_threshold(scores: list[float], keep_top_fraction: float) -> float:
-    """
-    Minimum score needed to land in the top keep_top_fraction of jobs (e.g. 0.30 => top 30%).
-    Uses the smallest score among the top ceil(fraction * n) jobs.
-    """
     if not scores:
         return 0.0
     if len(scores) == 1:
@@ -156,7 +135,6 @@ def _label_match_quality(
     smin: float,
     stage: str,
 ) -> None:
-    """Assign match_quality: high / standard / exploratory (never pretend weak matches are strong)."""
     spread = max(1e-6, smax - smin)
     for j in jobs:
         sc = float(score_map.get(j.id, 0.0))
@@ -173,12 +151,6 @@ def _finalize_ranked_feed(
     ranked: list | QuerySet,
     score_map: dict[int, float],
 ) -> tuple[list[Job], dict[int, float], dict]:
-    """
-    Dedupe, then progressive filtering with guaranteed non-empty output when candidates exist.
-    Stage 1: percentile-based (top ~30% by score) with a floor for tight distributions.
-    Stage 2: relaxed floor (e.g. 0.25).
-    Stage 3: top-N by score only (exploratory quality label).
-    """
     meta: dict = {
         "fallback_stage": 0,
         "effective_threshold": None,
@@ -212,8 +184,6 @@ def _finalize_ranked_feed(
         len(deduped),
         dupes_dropped,
     )
-
-    # Primary: dynamic percentile (top ~30% of jobs) with a floor so tight spreads still return rows.
     p_top = _percentile_threshold(scores, keep_top_fraction=0.30)
     spread = smax - smin
     if spread < 0.06:
@@ -245,7 +215,6 @@ def _finalize_ranked_feed(
             )
         return filtered, score_map, meta
 
-    # Stage 2: lower threshold (never rely on one static 0.43).
     relaxed = max(0.10, min(_FALLBACK_RELAXED_FLOOR, smin + 0.4 * spread))
     meta["effective_threshold"] = relaxed
     filtered = _filter_by_min_score(deduped, score_map, relaxed)
@@ -270,7 +239,6 @@ def _finalize_ranked_feed(
             )
         return filtered, score_map, meta
 
-    # Stage 3: top N by score — always non-empty if deduped non-empty.
     top_n = min(20, len(deduped))
     ordered = sorted(
         deduped,
@@ -304,7 +272,6 @@ def _public_match_intro(tech_mode: bool) -> str:
 
 
 def _public_fit_closing(raw_model_score: float) -> str:
-    """Closing line for job cards: no raw numbers, no negative 'weak' framing."""
     if raw_model_score >= _STRONG_TIER_MIN:
         return "Several of your strengths line up well with this role."
     if raw_model_score >= _MODERATE_TIER_MIN:
@@ -326,7 +293,6 @@ class JobDiscoveryPagination(PageNumberPagination):
 
 
 def _extract_skills(user_skills_raw: str) -> list[str]:
-    # Supports both comma-separated skills and free-text profile summaries.
     if not user_skills_raw:
         return []
 
@@ -351,7 +317,6 @@ def _extract_skills(user_skills_raw: str) -> list[str]:
             seen.add(w)
             keywords.append(w)
 
-    # Add high-signal multi-word terms when present.
     if "machine" in seen and "learning" in seen:
         keywords.insert(0, "machine learning")
     if "artificial" in seen and "intelligence" in seen:
@@ -363,15 +328,10 @@ def _extract_skills(user_skills_raw: str) -> list[str]:
 
 
 def _cosine_to_unit_interval(raw: float) -> float:
-    """Map raw cosine similarity [-1, 1] to [0, 1] for blending."""
     return max(0.0, min(1.0, (float(raw) + 1.0) / 2.0))
 
 
 def _overlap_ratio(matches: int, pool_len: int, *, cap: int = 10, min_denom: int = 3) -> float:
-    """
-    Fraction of a skill pool matched, with a capped denominator so long analyzed profiles
-    (dozens of skills) do not collapse overlap to near zero for normal listings.
-    """
     if pool_len <= 0:
         return 0.0
     denom = max(min_denom, min(pool_len, cap))
@@ -388,10 +348,6 @@ def _fuse_embedding_with_lexical(
     general_lex: float,
     lexical_skill_fit: float,
 ) -> tuple[float, float]:
-    """
-    Sentence-transformer cosine can still understate obvious keyword overlap vs. sparse text.
-    Fuse lexical agreement into the embedding channel so scores track visible skill fit.
-    """
     e_sk = _cosine_to_unit_interval(raw_skills_cos)
     e_nd = _cosine_to_unit_interval(raw_needs_cos)
 
@@ -400,7 +356,6 @@ def _fuse_embedding_with_lexical(
     else:
         lex = min(1.0, 0.58 * float(general_lex) + 0.42 * float(lexical_skill_fit))
 
-    # More lexical overlap → trust "lift" more (cap so pure embedding-only rows still differ).
     mix = min(0.62, 0.26 + 0.58 * lex)
     lex_floor = 0.12 + 0.88 * lex
     e_sk_fused = min(1.0, (1.0 - mix) * e_sk + mix * max(e_sk, lex_floor))
@@ -484,7 +439,6 @@ def _apply_embedding_ranking(
             matched_general = [t for t in gen_pool if _term_matches_text(t, text, text_tokens)][:8]
             matched_strength = [t for t in strength_pool if _term_matches_text(t, text, text_tokens)][:6]
 
-            # Combined non-tech overlap for general mode / supporting signals
             matched_skills = [s for s in profile["skills"] if _term_matches_text(s, text, text_tokens)][:8]
             keyword_hits = len(matched_skills)
             title_hits = sum(1 for term in profile["skills"] if _term_matches_text(term, title_text, title_tokens))
@@ -523,7 +477,6 @@ def _apply_embedding_ranking(
             avoid_environment_penalty = min(0.10, 0.035 * min(avoid_hits, 4))
 
             if tech_mode:
-                # MODE A: technical + fused embedding; lexical fusion already lifted e_skill when keywords match.
                 tech_weak = not matched_technical and title_tech_hits == 0 and e_skill < 0.40
 
                 positive = (
@@ -539,7 +492,6 @@ def _apply_embedding_ranking(
                 elif tech_ratio < 0.10 and title_tech_ratio < 0.10:
                     positive *= 0.82
             else:
-                # MODE B: general skills + fused embedding.
                 title_fit = min(1.0, title_hits / 4.0)
 
                 signal_count = sum(
@@ -734,7 +686,6 @@ def _get_profile_signals(passport: WorkplaceProfile) -> tuple[list[str], list[st
     avoid_terms.extend(_extract_skills(" ".join(str(v) for v in limitations if v)))
     avoid_terms.extend(_extract_skills(" ".join(str(v) for v in (passport.dealbreakers or []) if v)))
 
-    # Deduplicate but keep stable order.
     def _dedupe(items: list[str]) -> list[str]:
         seen: set[str] = set()
         out: list[str] = []
@@ -849,7 +800,6 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
             conflicts.append(f"soft conflict: {label}")
             penalties.append(f"soft:{label}")
 
-    # Cap soft rule stacking: diminishing returns (avoid total collapse).
     penalty_score += min(0.36, 0.14 * soft_hits + 0.08 * max(0, soft_hits - 2))
 
     lim_hits = 0
@@ -860,7 +810,6 @@ def _constraint_conflicts(profile: dict, job: Job) -> tuple[list[str], list[str]
             penalties.append(f"soft_limit:{lim}")
     penalty_score += min(0.15, 0.045 * min(lim_hits, 4))
 
-    # Final cap before application layer (second cap also applied in scoring).
     penalty_score = min(0.92, penalty_score)
     return conflicts[:10], penalties[:12], penalty_score, hard_block
 
@@ -869,7 +818,6 @@ def _ensure_job_embeddings(qs) -> None:
     from mindable.mindable_app.embedding_service import build_job_embeddings, get_embedding_version
 
     ver = get_embedding_version()
-    # Backfill or refresh when embeddings missing or model version changed (legacy hash → ST).
     missing = list(
         qs.filter(
             Q(skills_embedding__isnull=True)
@@ -908,7 +856,6 @@ def _extract_bullets(block: str) -> list[str]:
 
 
 def _sentences_from_paragraph(text: str, *, limit: int = 8) -> list[str]:
-    """Split accessible rewrite prose into short snippets for translated_tasks / lists."""
     t = (text or "").strip()
     if not t:
         return []
@@ -1005,9 +952,7 @@ class JobDiscoveryHubView(generics.ListAPIView):
         print("DEBUG total jobs in DB:", Job.objects.count())
         print("DEBUG translated jobs:", Job.objects.filter(is_translated=True).count())
 
-        
-        # Decide whether we should refresh the job pool using the broader
-        # profile-derived fetch terms (not only raw extracted keywords).
+
         user_has_matching_jobs = Job.objects.none()
         try:
             skill_filter = Q()
@@ -1052,7 +997,6 @@ class JobDiscoveryHubView(generics.ListAPIView):
             qs = qs.filter(job_type=job_type)
 
         
-        # Refill when user has dismissed many roles and feed gets too small.
         if qs.count() < self._MIN_FEED_SIZE:
             try:
                 fetch_and_save_jobs(
@@ -1064,7 +1008,6 @@ class JobDiscoveryHubView(generics.ListAPIView):
             except Exception as e:
                 logger.error("feed refill fetch failed: %s", e)
 
-        # If pool is still thin, perform one wider refresh using full analyzed terms.
         if qs.count() < self._REFRESH_IF_MATCHES_LT and fetch_terms:
             try:
                 fetch_and_save_jobs(
@@ -1077,7 +1020,6 @@ class JobDiscoveryHubView(generics.ListAPIView):
                 logger.error("wide refresh fetch failed: %s", e)
 
         if qs.count() < self._MIN_FEED_SIZE:
-            # Keep fallback personalized: pick from all jobs, then rank by embeddings per user.
             qs = Job.objects.filter(is_translated=True).exclude(id__in=dismissed_job_ids)
 
         print("DEBUG: final qs count:", qs.count())
@@ -1089,9 +1031,6 @@ class JobDiscoveryHubView(generics.ListAPIView):
         logger.info("JOB_PIPELINE|matching_mode=%s", self._matching_mode)
         ranked_qs, score_map, _explanations = _apply_embedding_ranking(qs, passport, profile_struct)
 
-        # If the ranking has too few "role-aligned" jobs, refresh once more with
-        # broader fetch terms and re-rank. This prevents the UI from showing only
-        # 1-2 strong matches while many weaker matches exist in the pool.
         top_n = getattr(self.pagination_class, "page_size", 10)
         role_aligned = sum(
             1

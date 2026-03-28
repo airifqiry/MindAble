@@ -111,7 +111,6 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 LOGIN_URL = '/login/'
 
-# Sentence-transformers (384-d: all-MiniLM-L6-v2). Bump MINDABLE_EMBEDDING_VERSION to re-embed DB rows.
 MINDABLE_EMBEDDING_MODEL = os.environ.get(
     "MINDABLE_EMBEDDING_MODEL",
     "sentence-transformers/all-MiniLM-L6-v2",

@@ -99,12 +99,11 @@ def passport_step4(request):
     if request.method == 'POST':
         form = PassportStep4Form(request.POST, request.FILES)
         if form.is_valid():
-            # Retrieve all data from session
+
             s1 = request.session.get('passport_step1', {})
             s2 = request.session.get('passport_step2', {})
             s3 = request.session.get('passport_step3', {})
             
-            # Save to the Database (WorkplaceProfile)
             profile = WorkplaceProfile.objects.create(
                 user=request.user,
                 skills=s1.get('skills', ''),
@@ -114,7 +113,6 @@ def passport_step4(request):
                 success_enablers=form.cleaned_data.get('success_enablers', {})
             )
             
-            # Clean up session
             for key in ['passport_step1', 'passport_step2', 'passport_step3']:
                 request.session.pop(key, None)
                 
@@ -125,5 +123,4 @@ def passport_step4(request):
 
 @login_required
 def basecamp(request):
-    # This is your main dashboard after login/profile setup
     return render(request, 'basecamp.html')

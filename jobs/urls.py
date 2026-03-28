@@ -1,8 +1,3 @@
-"""
-Include this in your main urls.py with:
-    path('api/jobs/', include('jobs.urls')),
-"""
-
 from django.urls import path
 from .views import JobDiscoveryHubView, JobDetailView, NotInterestedView
 

@@ -27,7 +27,6 @@ def get_embedding_model_name() -> str:
 
 
 def get_embedding_version() -> str:
-    """Bump MINDABLE_EMBEDDING_VERSION in settings when changing model or embedding logic."""
     try:
         from django.conf import settings
 

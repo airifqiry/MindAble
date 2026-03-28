@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-# Heuristic flags from listing text — best-effort; omit if nothing matches.
 _PAY_RE = re.compile(
     r"(?:£|€|\$)\s*[\d,.]+(?:\s*[-–]\s*(?:£|€|\$)?\s*[\d,.]+)?(?:\s*(?:k|K|\/yr|(?:per|\/)\s*year))?",
     re.IGNORECASE,
@@ -70,7 +69,6 @@ def logistics_highlights_for_job(job) -> list[str]:
     if "home office" in lower or "home-office stipend" in lower or "equipment stipend" in lower:
         lines.append("Home office or equipment support is mentioned.")
 
-    # Dedupe while preserving order (case-insensitive).
     seen: set[str] = set()
     out: list[str] = []
     for line in lines:

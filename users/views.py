@@ -11,7 +11,7 @@ from .forms import RegisterForm, LoginForm
 def register_view(request):
     if request.method == 'POST':
         post = request.POST.copy()
-        # JS may not run; align with login (email as username).
+
         email = (post.get("email") or "").strip()
         if email and not (post.get("username") or "").strip():
             post["username"] = email
@@ -116,7 +116,7 @@ def profile_upsert_api(request):
         profile.skills_embedding = skills_emb
         profile.needs_embedding = needs_emb
         profile.embedding_version = get_embedding_version()
-        # Persist structured analysis so ranking can use all profile signals.
+  
         profile.success_enablers = {
             'text': enablers,
             'analyzed_profile': analyzed,
@@ -222,7 +222,6 @@ def chat_history(request):
     return JsonResponse(data, safe=False, status=200)
 
 
-# Backward compatibility for existing frontend path.
 @login_required
 @require_POST
 def prep_chat_api(request):

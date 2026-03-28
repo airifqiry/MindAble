@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
-# This imports the model you specifically built for the database
 from users.models import WorkplaceProfile 
 
 User = get_user_model()
@@ -25,9 +24,6 @@ class RegisterForm(forms.ModelForm):
         if p1 and p2 and p1 != p2:
             raise forms.ValidationError("Passwords do not match")
         return cleaned_data
-
-# --- The 4 Steps of the Workplace Profile (Passport) ---
-# These match the fields you created in your WorkplaceProfile model
 
 class PassportStep1Form(forms.ModelForm):
     class Meta:

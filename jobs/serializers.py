@@ -139,17 +139,6 @@ class JobListSerializer(serializers.ModelSerializer):
 
 
 class JobDetailSerializer(serializers.ModelSerializer):
-    """
-    Full serializer for the Job Detail / AI Translator page.
-
-    translated_tasks  → retained for internal tools / chat context (not shown as “duties” in listings UI)
-
-    toxicity_warnings → warning label strings
-        e.g. ["Original post mentioned: 'must work under extreme pressure'"]
-
-    original_description is intentionally excluded —
-    users only ever see the AI-translated version.
-    """
 
     company_name = serializers.CharField(source='company.name', read_only=True)
     display_title = serializers.SerializerMethodField()
