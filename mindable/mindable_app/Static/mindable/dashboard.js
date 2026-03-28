@@ -1,36 +1,9 @@
-// Nav scroll shadow
-window.addEventListener('scroll', () => {
-  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 10);
-});
+// Menu open/close: common.js. Nav scroll shadow: common.js.
 
-// Nav dropdown menu
-const menuBtn = document.getElementById('nav-menu-btn');
-const menuPanel = document.getElementById('nav-menu-panel');
-
-function openMenu() {
-  menuPanel.hidden = false;
-  menuBtn.classList.add('open');
-  menuBtn.setAttribute('aria-expanded', 'true');
-}
-function closeMenu() {
-  menuPanel.hidden = true;
-  menuBtn.classList.remove('open');
-  menuBtn.setAttribute('aria-expanded', 'false');
-}
-menuBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  menuPanel.hidden ? openMenu() : closeMenu();
-});
-document.addEventListener('click', (e) => {
-  if (!menuPanel.hidden && !menuPanel.contains(e.target)) closeMenu();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeMenu();
-});
-
-// Scroll reveal
+// Home dashboard: scroll reveal uses .reveal.visible (not common .in-view)
 const observer = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+  entries.forEach((e) => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
 }, { threshold: 0.12 });
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
+document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));

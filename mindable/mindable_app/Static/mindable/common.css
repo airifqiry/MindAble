@@ -1,5 +1,105 @@
 /* Shared UI behaviors: nav dropdown + gentle scroll reveal */
 
+/* Design tokens (every page that loads common.css) */
+:root {
+  --white: #ffffff;
+  --bg: #f8f7ff;
+  --blue: #5b7fff;
+  --purple: #8b5cf6;
+  --green: #10b981;
+  --text: #1a1a2e;
+  --muted: #6b7280;
+  --border: rgba(139, 92, 246, 0.15);
+  --grad: linear-gradient(135deg, #5b7fff 0%, #8b5cf6 50%, #10b981 100%);
+  --grad-btn: linear-gradient(90deg, #5b7fff 0%, #8b5cf6 50%, #10b981 100%);
+  --glass-bg: rgba(248, 247, 255, 0.5);
+  --glass-blur: blur(24px);
+  --shadow: 0 8px 40px rgba(91, 127, 255, 0.12);
+}
+
+/* One shared top bar everywhere base.html is used */
+#nav-wrapper {
+  position: relative;
+  z-index: 250;
+}
+
+#nav-wrapper nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+  height: 68px;
+  background: rgba(248, 247, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+#nav-wrapper nav.scrolled {
+  box-shadow: 0 4px 30px rgba(91, 127, 255, 0.1);
+}
+
+#nav-wrapper .nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+#nav-wrapper .nav-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--grad);
+  display: grid;
+  place-items: center;
+}
+
+#nav-wrapper .nav-logo svg {
+  width: 18px;
+  height: 18px;
+  stroke: white;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+#nav-wrapper .nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+#nav-wrapper .nav-menu-trigger {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+#nav-wrapper .nav-menu-trigger:hover {
+  color: var(--purple);
+}
+
+@media (max-width: 900px) {
+  #nav-wrapper nav {
+    padding: 0 1.25rem;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -69,6 +169,18 @@ html {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+#nav-menu-panel #logout-action {
+  color: var(--muted);
+  margin-top: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+#nav-menu-panel #logout-action:hover {
+  background: rgba(239, 68, 68, 0.06);
+  color: #ef4444;
 }
 
 @media (max-width: 900px) {

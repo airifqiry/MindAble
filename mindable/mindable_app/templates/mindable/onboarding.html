@@ -7,13 +7,13 @@
 <title>MindAble – Your Profile</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="{% static 'common.css' %}"/>
 <link rel="stylesheet" href="{% static 'onboarding.css' %}"/>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
 
 </head>
-<body>
+<body data-active-page="">
 <form style="display:none">{% csrf_token %}</form>
-<script src="{% static 'onboarding.js' %}?v=2"></script>
 <div class="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 
 <div class="overlay" id="overlay">
@@ -21,21 +21,10 @@
     <div class="check-ring"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
     <h2>Profile complete! 🎉</h2>
     <p>Your AI filters are now active. Every job on your board is matched to your neurotype, strengths and what you actually need to thrive.</p>
-    <button class="btn-enter" onclick="window.location.href='{% url 'jobs' %}'">
-      Enter the Job Board
-      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:white;fill:none;stroke-width:2.2;stroke-linecap:round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
-    </button>
   </div>
 </div>
 
-<nav>
-  <a class="brand" href="{% url 'home' %}">
-    <div class="brand-mark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
-    MindAble
-  </a>
-  <span class="nav-tag">Your Profile</span>
-  <a class="nav-back" href="{% url 'home' %}">← Back</a>
-</nav>
+{% include 'mindable/partials/nav.html' %}
 
 <main>
   <div class="hero">
@@ -161,5 +150,7 @@
   </div>
 </main>
 
+<script src="{% static 'common.js' %}"></script>
+<script src="{% static 'onboarding.js' %}?v=2"></script>
 </body>
 </html>

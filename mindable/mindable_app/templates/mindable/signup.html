@@ -19,23 +19,13 @@
   <div class="aura aura-3"></div>
 </div>
  
-<!-- Nav -->
-<nav>
-  <a class="nav-brand" href="#">
+<nav class="signup-nav-only">
+  <a class="nav-brand" href="{% url 'home' %}">
     <div class="nav-logo">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </div>
     MindAble
   </a>
-  <div class="nav-links">
-    <a href="#">How It Works</a>
-    <a href="#">Features</a>
-    <a href="#">Stories</a>
-  </div>
-  <div class="nav-cta">
-    <a class="nav-login" href="#" onclick="switchTab('login');return false;">Log In</a>
-    <a class="nav-signup" href="#" onclick="switchTab('signup');return false;">Sign Up</a>
-  </div>
 </nav>
  
 <!-- Page -->
@@ -50,7 +40,7 @@
       <span class="grad-text">define your future</span>
     </h1>
  
-    <p class="left-sub">We match your unique strengths with the right opportunities. Build your Workplace Passport, and let our AI find jobs that truly fit you.</p>
+    <p class="left-sub">We match your unique strengths with the right opportunities. Let our AI find jobs that truly fit you.</p>
  
     <div class="features-list">
       <div class="feat">
@@ -99,7 +89,7 @@
             <input type="email" id="l-email" name="username" placeholder="you@example.com" autocomplete="email"/>
           </div>
 
-          <div class="field">
+          <div class="field field-login-password">
             <label for="l-pw">Password</label>
             <div class="pw-wrap">
               <input type="password" id="l-pw" name="password" placeholder="••••••••" autocomplete="current-password"/>
@@ -109,20 +99,10 @@
             </div>
           </div>
 
-          <a href="#" class="forgot">Forgot password?</a>
           <p class="err" id="l-err">Please enter your email and password.</p>
 
-          <button class="btn-grad" type="submit">Log in to MindAble →</button>
+          <button class="btn-grad btn-login-submit" type="submit">Log in to MindAble →</button>
         </form>
- 
-        <div class="divider">or continue with</div>
- 
-        <button class="btn-ghost" type="button">
-          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-          Continue with Google
-        </button>
- 
-        <p class="policy">By logging in you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
       </div>
  
       <!-- ══ SIGN UP ══ -->
@@ -131,14 +111,6 @@
           {% csrf_token %}
           <input type="hidden" id="su-username" name="username" value=""/>
  
-        <!-- step dots -->
-        <div class="step-dots">
-          <div class="dot active" id="d0"></div>
-          <div class="dot" id="d1"></div>
-          <div class="dot" id="d2"></div>
-        </div>
- 
-        <!-- STEP 0 – Account -->
         <div class="signup-step active" id="s0">
           <p class="form-title">Create your account</p>
           <p class="form-sub">A safe space, built just for you.</p>
@@ -167,87 +139,7 @@
 
           <p class="err" id="s0-err">Please fill in all fields (password min. 8 characters).</p>
  
-          <div class="divider">or</div>
-          <button class="btn-ghost" type="button">
-            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Sign up with Google
-          </button>
- 
-          <button class="btn-grad" type="button" onclick="goStep(1)">Continue →</button>
-          <p class="policy">By signing up you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
-        </div>
- 
-        <!-- STEP 1 – Workplace Passport -->
-        <div class="signup-step" id="s1">
-          <p class="form-title">Workplace Passport 🛂</p>
-          <p class="form-sub">Private and powering your feed. Tell us what you need — we'll protect it.</p>
- 
-          <span class="section-label">Your dealbreakers</span>
-          <div class="check-group" id="dealbreakers">
-            <span class="chip" onclick="this.classList.toggle('on')">Loud / open offices</span>
-            <span class="chip" onclick="this.classList.toggle('on')">Phone / cold-calling</span>
-            <span class="chip" onclick="this.classList.toggle('on')">Unpredictable shifts</span>
-            <span class="chip" onclick="this.classList.toggle('on')">Strict dress codes</span>
-            <span class="chip" onclick="this.classList.toggle('on')">Frequent travel</span>
-            <span class="chip" onclick="this.classList.toggle('on')">Fast-paced targets</span>
-            <span class="chip" onclick="this.classList.toggle('on')">In-person only</span>
-            <span class="chip" onclick="this.classList.toggle('on')">No async option</span>
-          </div>
- 
-          <span class="section-label" style="margin-top:.3rem;">Weekly energy baseline</span>
-          <div class="slider-wrap">
-            <input type="range" id="energy" min="1" max="5" value="3" oninput="updateEnergy(this)"/>
-            <div class="slider-label-row">
-              <span>Very low</span>
-              <span id="e-label" style="color:var(--purple);font-weight:500;">Moderate</span>
-              <span>Full capacity</span>
-            </div>
-          </div>
- 
-          <div class="step-nav">
-            <button class="btn-back" type="button" onclick="goStep(0)">← Back</button>
-            <button class="btn-grad btn-next" type="button" onclick="goStep(2)">Continue →</button>
-          </div>
-        </div>
- 
-        <!-- STEP 2 – Contribution -->
-        <div class="signup-step" id="s2">
-          <p class="form-title">Your contribution 💚</p>
-          <p class="form-sub">MindAble is ad-free and runs on your support. Choose what works for you — no pressure, ever. Minimum $0.50/month.</p>
- 
-          <div class="field">
-            <label>Monthly amount (USD)</label>
-            <div class="contrib-row">
-              <div class="contrib-input">
-                <span>$</span>
-                <input type="number" id="contrib" min="0.50" step="0.50" value="0.50" class="field" style="padding-left:1.6rem;border-radius:11px;border:1.5px solid var(--border);background:rgba(255,255,255,.8);font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;width:100%;padding-top:.75rem;padding-bottom:.75rem;"/>
-              </div>
-              <div class="presets">
-                <button class="preset on" type="button" onclick="setPre(this,'0.50')">$0.50</button>
-                <button class="preset" type="button" onclick="setPre(this,'3')">$3</button>
-                <button class="preset" type="button" onclick="setPre(this,'5')">$5</button>
-                <button class="preset" type="button" onclick="setPre(this,'10')">$10</button>
-              </div>
-            </div>
-          </div>
- 
-          <p style="font-size:.76rem;color:var(--muted);line-height:1.6;">Every dollar keeps MindAble independent, ad-free, and shipping features for you. Cancel or change anytime.</p>
-          <p class="err" id="s2-err">Minimum is $0.50/month.</p>
- 
-          <div class="step-nav">
-            <button class="btn-back" type="button" onclick="goStep(1)">← Back</button>
-            <button class="btn-grad btn-next" type="button" onclick="handleSignup()">Create my account 🎉</button>
-          </div>
-        </div>
- 
-        <!-- SUCCESS -->
-        <div class="success" id="success">
-          <div class="success-ring">
-            <svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
-          </div>
-          <p class="success-title">You're in! Welcome 🌿</p>
-          <p class="success-sub">Your Workplace Passport is live. Head to your Daily Basecamp — jobs that truly fit are waiting.</p>
-          <button class="btn-grad" type="button" style="max-width:220px;margin:0 auto;" onclick="alert('→ Redirecting to your Basecamp…')">Go to my Basecamp →</button>
+          <button class="btn-grad" type="button" onclick="handleSignup()">Create my account 🎉</button>
         </div>
  
         </form>

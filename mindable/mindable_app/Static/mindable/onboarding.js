@@ -1,7 +1,7 @@
 const fields  = ['f-skills','f-values','f-neurotype','f-disadvantages','f-enablers'];
 const pillIds = ['sp1','sp15','sp2','sp3','sp4'];
 const cardIds = ['card1','card15','card2','card3','card4'];
-const NAV_H   = 62 + 58; // nav + sticky progress strip
+const NAV_H   = 68 + 58; // nav + sticky progress strip
  
 function jumpTo(i){
   const card = document.getElementById(cardIds[i]);
@@ -107,13 +107,6 @@ function submitProfile(){
   });
 }
 
-// Some onboarding HTML variants used a static `.html` redirect.
-// Force the "Enter the Job Board" button to always go to our Django route.
 document.addEventListener('DOMContentLoaded', () => {
   updateProgress();
-  const btn = document.querySelector('.btn-enter');
-  if (!btn) return;
-  btn.onclick = () => {
-    window.location.href = '/jobs/';
-  };
 });

@@ -71,8 +71,17 @@ function setupScrollReveal() {
   });
 }
 
+function setupNavScrollShadow() {
+  const nav = document.getElementById('navbar');
+  if (!nav) return;
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 10);
+  }, { passive: true });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setupNavDropdown();
   setupScrollReveal();
+  setupNavScrollShadow();
 });
 

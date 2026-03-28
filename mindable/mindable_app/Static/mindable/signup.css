@@ -46,31 +46,22 @@ body {
   to   { transform: scale(1.12) translate(20px, 15px); }
 }
 
-/* Top nav */
-nav {
+/* Top nav — logo only (no menu) */
+.signup-nav-only {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-start;
   padding: 0 2rem; height: 72px;
   background: rgba(248,247,255,.72);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
 }
-.nav-brand { display: flex; align-items: center; gap: .6rem; text-decoration: none; color: var(--text); font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
-.nav-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--grad); }
-.nav-logo svg { width: 19px; height: 19px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
-.nav-links { display: flex; gap: 1.2rem; }
-.nav-links a { text-decoration: none; color: var(--muted); font-size: .9rem; }
-.nav-links a:hover { color: var(--purple); }
-.nav-cta { display: flex; gap: .8rem; }
-.nav-login, .nav-signup { text-decoration: none; font-size: .88rem; }
-.nav-login { color: var(--muted); }
-.nav-signup {
-  color: white;
-  background: var(--grad-btn);
-  border-radius: 999px;
-  padding: .45rem .95rem;
-  box-shadow: 0 3px 14px rgba(91,127,255,.2);
-}
+.signup-nav-only .nav-brand { display: flex; align-items: center; gap: .6rem; text-decoration: none; color: var(--text); font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+.signup-nav-only .nav-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--grad); }
+.signup-nav-only .nav-logo svg { width: 19px; height: 19px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+/* Login: space between password field and submit button */
+#panel-login .field-login-password { margin-bottom: 1rem; }
+#panel-login .btn-login-submit { margin-top: 1.1rem; }
 
 /* Two-column layout */
 .page {
