@@ -116,3 +116,7 @@ MINDABLE_EMBEDDING_MODEL = os.environ.get(
     "sentence-transformers/all-MiniLM-L6-v2",
 )
 MINDABLE_EMBEDDING_VERSION = os.environ.get("MINDABLE_EMBEDDING_VERSION", "st-v1")
+
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE = 'Lax'
